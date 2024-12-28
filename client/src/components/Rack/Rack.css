@@ -1,0 +1,8 @@
+.rack {
+    display: flex;
+    margin-top: 20px;
+    justify-content: center;
+    background-color: #d9d9d9;
+    padding: 10px;
+    border: 2px solid black;
+}

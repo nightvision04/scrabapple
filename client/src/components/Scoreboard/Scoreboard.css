@@ -1,0 +1,8 @@
+.scoreboard {
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-around;
+    background-color: #d9d9d9;
+    padding: 10px;
+    border: 2px solid black;
+}

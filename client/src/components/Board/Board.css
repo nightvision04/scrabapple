@@ -1,0 +1,45 @@
+.board {
+    display: grid;
+    grid-template-columns: repeat(15, 25px); /* Adjust cell size as needed */
+    grid-template-rows: repeat(15, 25px);
+    border: 2px solid #734222; /* Dark wood color */
+    background-color: #c7a27c; /* Light wood color */
+}
+
+.board-row {
+    display: flex;
+}
+
+.board-cell {
+    width: 25px; /* Adjust cell size as needed */
+    height: 25px;
+    border: 1px solid #734222; /* Dark wood color */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #c7a27c; /* Light wood color */
+    cursor: pointer;
+    font-size: 14px; /* Adjust font size as needed */
+    font-weight: bold;
+    color: #734222;
+}
+
+.board-cell.dw { 
+    background-color: #ffc0cb; /* Light pink for double word */
+}
+
+.board-cell.dl {
+    background-color: #add8e6; /* Light blue for double letter */
+}
+
+.board-cell.tw {
+    background-color: #ff6b61; /* Light red for triple word */
+}
+
+.board-cell.tl {
+    background-color: #89cff0; /* Light blue for triple letter */
+}
+
+.board-cell:hover {
+    background-color: #e6d2b8; /* Slightly darker color on hover */
+}

@@ -1,0 +1,32 @@
+.tile {
+    background-color: #f0d9b5; /* Light wood color */
+    border: 1px solid #966f33; /* Darker wood color */
+    color: black;
+    width: 23px; /* Adjust size to fit in cell */
+    height: 23px; /* Adjust size to fit in cell */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    margin: 1px; /* Adjust margin as needed */
+    box-shadow: 2px 2px 3px rgba(0, 0, 0, 0.3); /* Add a shadow */
+    font-size: 16px; /* Adjust font size as needed */
+    font-weight: bold;
+}
+
+.tile.selected {
+    background-color: #61dafb; /* Highlight color */
+}
+
+.tile-letter {
+    font-size: 14px; /* Adjust font size as needed */
+    font-weight: bold;
+}
+
+.tile-value {
+    font-size: 8px; /* Adjust font size as needed */
+    position: relative;
+    top: 4px;
+    left: 2px;
+}

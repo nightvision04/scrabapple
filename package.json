@@ -1,0 +1,13 @@
+{
+  "name": "scrabble-game",
+  "version": "1.0.0",
+  "description": "2-player Scrabble game",
+  "scripts": {
+    "client": "cd client && yarn start",
+    "server": "node server/server.js",
+    "dev": "concurrently \"npm run server\" \"npm run client\""
+  },
+  "dependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

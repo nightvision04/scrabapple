@@ -1,0 +1,10 @@
+.json
+.png
+.ico
+.jpg
+.jpeg
+.gif
+.svg
+.exe
+.dll
+.md
