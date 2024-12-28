@@ -2,28 +2,37 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
 
-// Apply CORS middleware to allow requests from your React app
 app.use(cors({
-    origin: "http://localhost:3000" // Replace with your React app's URL if needed
+    origin: "http://localhost:3000"
 }));
 
 const io = socketIo(server, {
     cors: {
-        origin: "http://localhost:3000", // Replace with your React app's URL
+        origin: "http://localhost:3000",
         methods: ["GET", "POST"]
     }
 });
 
 const PORT = 8080;
 
-// Game logic functions (moved from client/src/utils.js)
+// Load dictionary
+const dictionary = new Set();
+try {
+    const dictPath = path.join(__dirname, 'words.txt');
+    const dictData = fs.readFileSync(dictPath, 'utf8');
+    dictData.split(/\r?\n/).forEach(word => dictionary.add(word.trim().toLowerCase()));
+} catch (err) {
+    console.error("Error loading dictionary:", err);
+}
+
 const BOARD_BONUSES = {
-    '7,7': 'dw', // Center square
-    '0,0': 'tw', '0,7': 'tw', '0,14': 'tw',
+    '7,7': 'dw', '0,0': 'tw', '0,7': 'tw', '0,14': 'tw',
     '7,0': 'tw', '7,14': 'tw', '14,0': 'tw',
     '14,7': 'tw', '14,14': 'tw',
     '1,1': 'dw', '2,2': 'dw', '3,3': 'dw',
@@ -49,11 +58,11 @@ const BOARD_BONUSES = {
 const createEmptyBoard = () => {
     const board = [];
     for (let i = 0; i < 15; i++) {
-        board[i] = Array(15).fill({ tile: null, bonus: null });
-    }
-    for (const coord in BOARD_BONUSES) {
-        const [row, col] = coord.split(',').map(Number);
-        board[row][col].bonus = BOARD_BONUSES[coord];
+        board[i] = [];
+        for (let j = 0; j < 15; j++) {
+            const coord = `${i},${j}`;
+            board[i][j] = { tile: null, bonus: BOARD_BONUSES[coord] || null };
+        }
     }
     return board;
 };
@@ -85,7 +94,6 @@ const drawTiles = (bag, num) => {
     return drawn;
 };
 
-// Initial game state (managed by the server)
 let gameState = {
     board: createEmptyBoard(),
     players: [
@@ -99,22 +107,40 @@ let gameState = {
 
 let connectedPlayers = 0;
 
+const sendGameStateToPlayer = (socket, playerId) => {
+    const playerSpecificGameState = {
+        ...gameState,
+        players: gameState.players.map((player, index) => ({
+            score: player.score,
+            rack: index === playerId ? player.rack : []
+        }))
+    };
+
+    socket.emit('gameUpdate', playerSpecificGameState);
+};
+
+// Add the route handler for /validate-word/:word
+app.get('/validate-word/:word', (req, res) => {
+    const word = req.params.word.toLowerCase();
+    const isValid = dictionary.has(word);
+    res.json({ isValid });
+});
+
 io.on('connection', (socket) => {
     console.log('New client connected:', socket.id);
     connectedPlayers++;
 
     socket.on('joinGame', () => {
         if (connectedPlayers <= 2) {
-            if (gameState.players[0].rack.length === 0) {
-                gameState.players[0].rack = drawTiles(gameState.bag, 7);
-            } else if (gameState.players[1].rack.length === 0) {
-                gameState.players[1].rack = drawTiles(gameState.bag, 7);
+            const playerId = gameState.players.findIndex(player => player.rack.length === 0);
+            if (playerId !== -1) {
+                gameState.players[playerId].rack = drawTiles(gameState.bag, 7);
+                sendGameStateToPlayer(socket, playerId);
             }
 
             if (connectedPlayers === 2) {
                 gameState.gameStarted = true;
-                console.log("Emitting gameUpdate:", gameState);
-                io.emit('gameUpdate', gameState); // Emit to all clients
+                io.emit('gameUpdate', gameState);
             }
         } else {
             socket.emit('errorMessage', 'Game is full');
@@ -123,58 +149,52 @@ io.on('connection', (socket) => {
 
     socket.on('updateBoard', (newBoard) => {
         gameState.board = newBoard;
-        socket.broadcast.emit('gameUpdate', gameState); // Emit to others except the sender
+        socket.broadcast.emit('boardUpdate', newBoard);
     });
 
     socket.on('updateRack', ({ playerId, rack }) => {
         gameState.players[playerId].rack = rack;
-        socket.broadcast.emit('gameUpdate', gameState); // Emit to others except the sender
+        socket.broadcast.emit('rackUpdate', { playerId, rack });
     });
 
     socket.on('playWord', (newGameState) => {
-        gameState = newGameState;
+        // Update only the necessary parts of the gameState
+        gameState.board = newGameState.board;
+        gameState.players = newGameState.players;
+        gameState.currentPlayer = newGameState.currentPlayer;
 
-        // Refill the rack of the current player
+        // Refill the current player's rack
         const currentPlayer = gameState.currentPlayer;
         const tilesNeeded = 7 - gameState.players[currentPlayer].rack.length;
         const newTiles = drawTiles(gameState.bag, tilesNeeded);
         gameState.players[currentPlayer].rack.push(...newTiles);
 
-        io.emit('gameUpdate', gameState); // Emit to all clients
+        // Emit the updated game state
+        io.emit('gameUpdate', gameState);
     });
 
     socket.on('exchangeTile', ({ playerId, rack, tileToExchange, currentPlayer }) => {
-        // Return the tile to the bag
         gameState.bag.push(tileToExchange);
-    
-        // Draw a new tile from the bag
         const newTiles = drawTiles(gameState.bag, 1);
-    
-        // Update the player's rack (add new tile, remove old tile)
         gameState.players[playerId].rack = [...rack, ...newTiles];
-    
-        // Update the current player
         gameState.currentPlayer = currentPlayer;
-    
-        // Emit gameUpdate to all clients
         io.emit('gameUpdate', gameState);
     });
 
     socket.on('passTurn', ({ currentPlayer }) => {
         gameState.currentPlayer = currentPlayer;
-        io.emit('gameUpdate', gameState); // Emit to all clients
+        io.emit('gameUpdate', gameState);
     });
 
     socket.on('shuffleRack', ({ playerId, rack }) => {
         gameState.players[playerId].rack = rack;
-        socket.emit('gameUpdate', gameState); // Only emit to the player who shuffled
+        socket.emit('rackUpdate', { playerId, rack });
     });
 
     socket.on('disconnect', () => {
         console.log('Client disconnected:', socket.id);
         connectedPlayers--;
         if (connectedPlayers === 0) {
-            // Reset the game state if all players have disconnected
             gameState = {
                 board: createEmptyBoard(),
                 players: [

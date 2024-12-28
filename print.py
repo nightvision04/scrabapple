@@ -63,7 +63,7 @@ def print_folder_structure_and_file_contents(root_dir, no_print_file="no-print.t
 root_directory = "."  # Replace with the directory you want to analyze
 no_print_path = "no-print.txt"
 # List of folders to exclude (add any others you need)
-nextjs_excluded_folders = ["node_modules", ".next", ".cache", "out"]
+nextjs_excluded_folders = ["node_modules", ".next", ".cache", "out", ".git"]
 
 # Example no-print.txt content:
 # .json

@@ -45,16 +45,30 @@ function App() {
             setError(message);
         });
 
+        newSocket.on('boardUpdate', (newBoard) => {
+            setBoard(newBoard);
+        });
+
+        newSocket.on('rackUpdate', ({ playerId, rack }) => {
+            if (playerId === currentPlayer) {
+                setPlayers(prevPlayers => {
+                    const newPlayers = [...prevPlayers];
+                    newPlayers[playerId] = { ...newPlayers[playerId], rack };
+                    return newPlayers;
+                });
+            }
+        });
+
         return () => newSocket.close();
     }, []);
 
     const handleRackTileClick = (tile, index) => {
-        setSelectedTile({ 
-          tile, 
-          from: { 
-            type: 'rack', 
-            index 
-          } 
+        setSelectedTile({
+          tile,
+          from: {
+            type: 'rack',
+            index
+          }
         });
       };
 
@@ -64,40 +78,40 @@ function App() {
           const newBoard = [...board];
           newBoard[row][col] = { ...newBoard[row][col], tile: null };
           setBoard(newBoard);
-      
+
           const updatedPlayers = [...players];
           updatedPlayers[currentPlayer].rack.push(existingTile);
           setPlayers(updatedPlayers);
           setSelectedTile(null);
-      
+
           socket.emit('updateBoard', newBoard);
-          socket.emit('updateRack', { 
-            playerId: currentPlayer, 
-            rack: updatedPlayers[currentPlayer].rack 
+          socket.emit('updateRack', {
+            playerId: currentPlayer,
+            rack: updatedPlayers[currentPlayer].rack
           });
         } else if (selectedTile) {
           // Place tile on board and remove from rack
           const newBoard = [...board];
           newBoard[row][col] = { ...newBoard[row][col], tile: selectedTile.tile };
           setBoard(newBoard);
-      
+
           // Remove the tile from the rack
           const updatedPlayers = [...players];
           const rackIndex = selectedTile.from.index;
           if (selectedTile.from.type === 'rack') {
             updatedPlayers[currentPlayer].rack.splice(rackIndex, 1);
             setPlayers(updatedPlayers);
-      
+
             socket.emit('updateRack', {
               playerId: currentPlayer,
               rack: updatedPlayers[currentPlayer].rack
             });
           }
-      
+
           setSelectedTile(null);
           socket.emit('updateBoard', newBoard);
         }
-      };
+    };
 
     const onDragEnd = (result) => {
         const { destination, source } = result;
@@ -172,7 +186,7 @@ function App() {
         }
     };
 
-    const handlePlayWord = () => {
+    const handlePlayWord = async () => {
         // 1. Get played tiles
         const playedTiles = [];
         for (let i = 0; i < 15; i++) {
@@ -222,13 +236,13 @@ function App() {
             }
         }
 
-        // 5. Validate the word (replace with your dictionary validation)
-        if (!isValidWord(word, board)) {
+        // 5. Validate the word
+        if (!(await isValidWord(word, board))) {
             alert("Invalid word.");
             return;
         }
 
-        // 6. Calculate score (replace with your scoring logic)
+        // 6. Calculate score
         const score = calculateScore(playedTiles, board);
 
         // 7. Update game state

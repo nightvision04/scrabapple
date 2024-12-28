@@ -39,19 +39,22 @@ export const drawTiles = (bag, num) => {
     return drawn;
 };
 
-// Placeholder for word validation function
-export const isValidWord = (word, board) => {
-    // Basic validation: Check if the word is at least 2 letters long
+// Function to validate words using the server-side dictionary
+export const isValidWord = async (word, board) => {
     if (word.length < 2) {
         return false;
     }
 
-    // Check against a predefined dictionary (replace with your actual dictionary)
-    const validWords = ["cat", "dog", "apple", "hello", "world"];
-    return validWords.includes(word.toLowerCase());
+    try {
+        const response = await fetch(`http://localhost:8080/validate-word/${word}`);
+        const data = await response.json();
+        return data.isValid;
+    } catch (error) {
+        console.error("Error validating word:", error);
+        return false;
+    }
 };
 
-// Placeholder for score calculation function
 export const calculateScore = (playedTiles, board) => {
     let score = 0;
     let wordMultiplier = 1;
