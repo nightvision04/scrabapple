@@ -9,12 +9,12 @@ const app = express();
 const server = http.createServer(app);
 
 app.use(cors({
-    origin: "http://localhost:3000"
+    origin: "*"
 }));
 
 const io = socketIo(server, {
     cors: {
-        origin: "http://localhost:3000",
+        origin: "*",
         methods: ["GET", "POST"]
     }
 });
@@ -210,6 +210,7 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(PORT, () => {
+// Bind server to 0.0.0.0 to listen on all interfaces
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server listening on port ${PORT}`);
 });

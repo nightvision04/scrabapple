@@ -9,7 +9,7 @@ import Tile from './components/Tile/Tile';
 import { isValidWord, calculateScore, drawTiles } from './utils';
 import './App.css';
 
-const SERVER_URL = 'http://localhost:8080';
+const SERVER_URL = 'http://10.0.0.82:8080';
 
 function App() {
     const [socket, setSocket] = useState(null);

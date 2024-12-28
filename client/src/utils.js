@@ -46,7 +46,7 @@ export const isValidWord = async (word, board) => {
     }
 
     try {
-        const response = await fetch(`http://localhost:8080/validate-word/${word}`);
+        const response = await fetch(`http://localhost:8080/validate-word/${word.toLowerCase()}`);
         const data = await response.json();
         return data.isValid;
     } catch (error) {
@@ -55,29 +55,93 @@ export const isValidWord = async (word, board) => {
     }
 };
 
+
 export const calculateScore = (playedTiles, board) => {
-    let score = 0;
-    let wordMultiplier = 1;
+    if (playedTiles.length === 0) return 0;
 
-    playedTiles.forEach(tile => {
-        const { row, col, tile: letter } = tile;
-        const letterValue = LETTER_VALUES[letter];
-        const bonus = board[row][col].bonus;
+    let totalScore = 0;
+    const scoredWords = new Set();
+    const newlyPlayedTiles = new Set(playedTiles.map(tile => `${tile.row},${tile.col}`));
 
-        let tileScore = letterValue;
+    // Determine the primary direction of the word based on the first two tiles
+    const isHorizontal = playedTiles.length > 1 ? playedTiles[0].row === playedTiles[1].row : true;
 
-        if (bonus === 'dl') {
-            tileScore *= 2;
-        } else if (bonus === 'tl') {
-            tileScore *= 3;
-        } else if (bonus === 'dw') {
-            wordMultiplier *= 2;
-        } else if (bonus === 'tw') {
-            wordMultiplier *= 3;
+    const calculateWordScore = (tiles) => {
+        let wordScore = 0;
+        let wordMultiplier = 1;
+        let hasNewTile = false; // Flag to check if the word has at least one new tile
+    
+        tiles.forEach(tile => {
+            const { row, col, tile: letter } = tile;
+            const letterValue = LETTER_VALUES[letter] || 0;
+            let tileScore = letterValue;
+            const bonus = board[row][col]?.bonus;
+    
+            // Apply bonuses only if the tile is newly played
+            if (newlyPlayedTiles.has(`${row},${col}`)) {
+                hasNewTile = true;
+                if (bonus === 'dl') tileScore *= 2;
+                else if (bonus === 'tl') tileScore *= 3;
+                if (bonus === 'dw') wordMultiplier *= 2;
+                if (bonus === 'tw') wordMultiplier *= 3;
+            }
+    
+            wordScore += tileScore;
+        });
+    
+        // Only return score if the word has at least one new tile
+        return hasNewTile ? wordScore * wordMultiplier : 0;
+    };
+
+    const getWordTiles = (startRow, startCol, horizontal) => {
+        let tiles = [];
+        let row = startRow;
+        let col = startCol;
+
+        // Move to the start of the word
+        while (row >= 0 && col >= 0 && board[row][col]?.tile) {
+            if (horizontal) col--;
+            else row--;
         }
 
-        score += tileScore;
+        // Adjust to get to the first tile
+        if (horizontal) col++;
+        else row++;
+
+        // Collect all tiles in the word
+        while (row < 15 && col < 15 && board[row][col]?.tile) {
+            tiles.push({
+                row,
+                col,
+                tile: board[row][col].tile
+            });
+            if (horizontal) col++;
+            else row++;
+        }
+
+        return tiles;
+    };
+
+    // Score main word
+    const mainWordTiles = getWordTiles(playedTiles[0].row, playedTiles[0].col, isHorizontal);
+    if (mainWordTiles.some(tile => newlyPlayedTiles.has(`${tile.row},${tile.col}`))) {
+        totalScore += calculateWordScore(mainWordTiles);
+        scoredWords.add(JSON.stringify(mainWordTiles));
+    }
+
+    // Score perpendicular words
+    playedTiles.forEach(playedTile => {
+        const { row, col } = playedTile;
+        const perpendicularWord = getWordTiles(row, col, !isHorizontal);
+
+        if (perpendicularWord.length > 1 && perpendicularWord.some(tile => newlyPlayedTiles.has(`${tile.row},${tile.col}`))) {
+            const wordKey = JSON.stringify(perpendicularWord);
+            if (!scoredWords.has(wordKey)) {
+                totalScore += calculateWordScore(perpendicularWord);
+                scoredWords.add(wordKey);
+            }
+        }
     });
 
-    return score * wordMultiplier;
+    return totalScore;
 };
