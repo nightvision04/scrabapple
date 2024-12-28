@@ -2,97 +2,100 @@ import React from 'react';
 import { Droppable } from 'react-beautiful-dnd';
 import Tile from '../Tile/Tile';
 
-const Board = ({ board, onTileClick }) => {
-  const handleTileClick = (rowIndex, colIndex) => {
-    // If there's a tile, we're clicking it to potentially remove it
-    if (board[rowIndex][colIndex].tile) {
-      const tile = board[rowIndex][colIndex].tile;
-      onTileClick(rowIndex, colIndex, tile); // Pass the tile info to parent
-    } else {
-      // Regular cell click (for placing tiles)
-      onTileClick(rowIndex, colIndex, null);
-    }
-  };
+const Board = ({ board, onTileClick, isCurrentPlayerTurn }) => {
+    const handleTileClick = (rowIndex, colIndex) => {
+        // If it's not the current player's turn, don't allow tile clicks
+        if (!isCurrentPlayerTurn) {
+            return;
+        }
+    
+        if (board[rowIndex][colIndex].tile) {
+            const tile = board[rowIndex][colIndex].tile;
+            onTileClick(rowIndex, colIndex, tile);
+        } else {
+            onTileClick(rowIndex, colIndex, null);
+        }
+    };
 
-  return (
-    <div className="w-full max-w-4xl mx-auto p-4">
-      <div className="aspect-square w-full">
-        <div className="grid grid-cols-15 gap-1 h-full w-full bg-amber-900 p-2 rounded-lg shadow-lg">
-          {board.map((row, rowIndex) => (
-            row.map((cell, colIndex) => (
-              <Droppable 
-                droppableId={`cell-${rowIndex}-${colIndex}`} 
-                key={`${rowIndex}-${colIndex}`}
-              >
-                {(provided) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    onClick={() => handleTileClick(rowIndex, colIndex)}
-                    className={`
-                      aspect-square flex items-center justify-center
-                      p-0.5 rounded cursor-pointer
-                      ${getBonusClassName(cell.bonus)}
-                    `}
-                  >
-                    {cell.tile ? (
-                      <Tile 
-                        value={cell.tile} 
-                        isSelected={false}
-                      />
-                    ) : (
-                      <>
-                        {rowIndex === 7 && colIndex === 7 ? (
-                          <span className="bg-pink-300 text-pink-900 hover:bg-pink-200">★</span>
-                        ) : (
-                          cell.bonus && (
-                            <div className="text-[8px] leading-none text-center font-medium">
-                              {getBonusText(cell.bonus)}
-                            </div>
-                          )
-                        )}
-                      </>
-                    )}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            ))
-          ))}
+    return (
+        <div className="w-full max-w-4xl mx-auto p-4">
+            <div className="aspect-square w-full">
+                <div className="grid grid-cols-15 gap-1 h-full w-full bg-amber-900 p-2 rounded-lg shadow-lg">
+                    {board.map((row, rowIndex) => (
+                        row.map((cell, colIndex) => (
+                            <Droppable
+                                droppableId={`cell-${rowIndex}-${colIndex}`}
+                                key={`${rowIndex}-${colIndex}`}
+                            >
+                                {(provided) => (
+                                    <div
+                                        ref={provided.innerRef}
+                                        {...provided.droppableProps}
+                                        onClick={() => handleTileClick(rowIndex, colIndex)}
+                                        className={`
+                                            aspect-square flex items-center justify-center
+                                            p-0.5 rounded cursor-pointer
+                                            ${getBonusClassName(cell.bonus)}
+                                        `}
+                                    >
+                                        {cell.tile ? (
+                                            <Tile
+                                                value={isCurrentPlayerTurn || cell.original ? cell.tile : '?'} // Show '?' if not current player's turn and not original
+                                                isSelected={false}
+                                            />
+                                        ) : (
+                                            <>
+                                                {rowIndex === 7 && colIndex === 7 ? (
+                                                    <span className="bg-pink-300 text-pink-900 hover:bg-pink-200">★</span>
+                                                ) : (
+                                                    cell.bonus && (
+                                                        <div className="text-[8px] leading-none text-center font-medium">
+                                                            {getBonusText(cell.bonus)}
+                                                        </div>
+                                                    )
+                                                )}
+                                            </>
+                                        )}
+                                        {provided.placeholder}
+                                    </div>
+                                )}
+                            </Droppable>
+                        ))
+                    ))}
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 const getBonusClassName = (bonus) => {
-  switch (bonus) {
-    case 'tw':
-      return 'bg-rose-600 text-white hover:bg-rose-500';
-    case 'dw':
-      return 'bg-pink-300 text-pink-900 hover:bg-pink-200';
-    case 'tl':
-      return 'bg-blue-500 text-white hover:bg-blue-400';
-    case 'dl':
-      return 'bg-blue-200 text-blue-900 hover:bg-blue-100';
-    default:
-      return 'bg-[#e9dcc9] hover:bg-amber-100';
-  }
+    switch (bonus) {
+        case 'tw':
+            return 'bg-rose-600 text-white hover:bg-rose-500';
+        case 'dw':
+            return 'bg-pink-300 text-pink-900 hover:bg-pink-200';
+        case 'tl':
+            return 'bg-blue-500 text-white hover:bg-blue-400';
+        case 'dl':
+            return 'bg-blue-200 text-blue-900 hover:bg-blue-100';
+        default:
+            return 'bg-[#e9dcc9] hover:bg-amber-100';
+    }
 };
 
 const getBonusText = (bonus) => {
-  switch (bonus) {
-    case 'tw':
-      return 'TW';
-    case 'dw':
-      return 'DW';
-    case 'tl':
-      return 'TL';
-    case 'dl':
-      return 'DL';
-    default:
-      return '';
-  }
+    switch (bonus) {
+        case 'tw':
+            return 'TW';
+        case 'dw':
+            return 'DW';
+        case 'tl':
+            return 'TL';
+        case 'dl':
+            return 'DL';
+        default:
+            return '';
+    }
 };
 
 export default Board;

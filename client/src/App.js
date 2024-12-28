@@ -71,46 +71,52 @@ function App() {
         });
       };
 
-    const handleBoardTileClick = (row, col, existingTile) => {
+      const handleBoardTileClick = (row, col, existingTile) => {
+        // Check if it's the current player's turn
+        if (!isCurrentPlayerTurn) {
+            return; // Do nothing if it's not the current player's turn
+        }
+    
         if (existingTile) {
-          // Remove tile from board and return to rack
-          const newBoard = [...board];
-          newBoard[row][col] = { ...newBoard[row][col], tile: null };
-          setBoard(newBoard);
-
-          const updatedPlayers = [...players];
-          updatedPlayers[currentPlayer].rack.push(existingTile);
-          setPlayers(updatedPlayers);
-          setSelectedTile(null);
-
-          socket.emit('updateBoard', newBoard);
-          socket.emit('updateRack', {
-            playerId: currentPlayer,
-            rack: updatedPlayers[currentPlayer].rack
-          });
-        } else if (selectedTile) {
-          // Place tile on board and remove from rack
-          const newBoard = [...board];
-          newBoard[row][col] = { ...newBoard[row][col], tile: selectedTile.tile };
-          setBoard(newBoard);
-
-          // Remove the tile from the rack
-          const updatedPlayers = [...players];
-          const rackIndex = selectedTile.from.index;
-          if (selectedTile.from.type === 'rack') {
-            updatedPlayers[currentPlayer].rack.splice(rackIndex, 1);
+            // Remove tile from board and return to rack
+            const newBoard = [...board];
+            newBoard[row][col] = { ...newBoard[row][col], tile: null };
+            setBoard(newBoard);
+    
+            const updatedPlayers = [...players];
+            updatedPlayers[currentPlayer].rack.push(existingTile);
             setPlayers(updatedPlayers);
-
+            setSelectedTile(null);
+    
+            socket.emit('updateBoard', newBoard);
             socket.emit('updateRack', {
-              playerId: currentPlayer,
-              rack: updatedPlayers[currentPlayer].rack
+                playerId: currentPlayer,
+                rack: updatedPlayers[currentPlayer].rack
             });
-          }
-
-          setSelectedTile(null);
-          socket.emit('updateBoard', newBoard);
+        } else if (selectedTile) {
+            // Place tile on board and remove from rack
+            const newBoard = [...board];
+            newBoard[row][col] = { ...newBoard[row][col], tile: selectedTile.tile };
+            setBoard(newBoard);
+    
+            // Remove the tile from the rack
+            const updatedPlayers = [...players];
+            const rackIndex = selectedTile.from.index;
+            if (selectedTile.from.type === 'rack') {
+                updatedPlayers[currentPlayer].rack.splice(rackIndex, 1);
+                setPlayers(updatedPlayers);
+    
+                socket.emit('updateRack', {
+                    playerId: currentPlayer,
+                    rack: updatedPlayers[currentPlayer].rack
+                });
+            }
+    
+            setSelectedTile(null);
+            socket.emit('updateBoard', newBoard);
         }
     };
+    
 
     const onDragEnd = (result) => {
         const { destination, source } = result;
@@ -186,7 +192,6 @@ function App() {
     };
 
     const handlePlayWord = async () => {
-        // 1. Get played tiles
         const playedTiles = [];
         for (let i = 0; i < 15; i++) {
             for (let j = 0; j < 15; j++) {
@@ -195,75 +200,73 @@ function App() {
                 }
             }
         }
-
+    
         if (playedTiles.length === 0) {
             alert("No tiles have been played.");
             return;
         }
-
-        // 2. Determine direction (horizontal/vertical)
-        const isHorizontal = playedTiles.every(tile => tile.row === playedTiles[0].row);
-        const isVertical = playedTiles.every(tile => tile.col === playedTiles[0].col);
-
-        if (playedTiles.length > 1 && !isHorizontal && !isVertical) {
+    
+        const isHorizontal = playedTiles.length === 1 || playedTiles.every(tile => tile.row === playedTiles[0].row);
+        const isVertical = playedTiles.length === 1 || playedTiles.every(tile => tile.col === playedTiles[0].col);
+    
+        if (!isHorizontal && !isVertical) {
             alert("Invalid word placement. Tiles must be in a straight line.");
             return;
         }
-
-        // 3. Sort played tiles based on direction
+    
         playedTiles.sort((a, b) => isHorizontal ? a.col - b.col : a.row - b.row);
-
-        // 4. Form the word
+    
         let word = "";
-        let startRow = playedTiles[0].row;
-        let startCol = playedTiles[0].col;
+        let [startRow, startCol] = [playedTiles[0].row, playedTiles[0].col];
+    
         if (isHorizontal) {
-            for (let i = startCol; i >= 0 && board[startRow][i].tile; i--) {
-                word = board[startRow][i].tile + word;
+            let i = startCol;
+            while (i >= 0 && board[startRow][i].tile) {
                 startCol = i;
+                i--;
             }
-            for (let i = startCol + 1; i < 15 && board[startRow][i].tile; i++) {
+            i = startCol;
+            while (i < 15 && board[startRow][i].tile) {
                 word += board[startRow][i].tile;
+                i++;
             }
         } else {
-            for (let i = startRow; i >= 0 && board[i][startCol].tile; i--) {
-                word = board[i][startCol].tile + word;
+            let i = startRow;
+            while (i >= 0 && board[i][startCol].tile) {
                 startRow = i;
+                i--;
             }
-            for (let i = startRow + 1; i < 15 && board[i][startCol].tile; i++) {
+            i = startRow;
+            while (i < 15 && board[i][startCol].tile) {
                 word += board[i][startCol].tile;
+                i++;
             }
         }
-
-        // 5. Validate the word
+    
         if (!(await isValidWord(word, board))) {
-            alert(`Invalid word: "${word}"`); // Show the attempted word
+            alert(`Invalid word: "${word}"`);
             return;
         }
-
-        // 6. Calculate score
+    
         const score = calculateScore(playedTiles, board);
-
-        // 7. Update game state
+    
         const updatedPlayers = [...players];
         updatedPlayers[currentPlayer].score += score;
-
-        // 9. Mark tiles as original
+    
         const newBoard = board.map(row => row.map(cell => ({ ...cell, original: cell.tile ? true : false })));
         setBoard(newBoard);
-
-        // 10. Switch player
-        const nextPlayer = (currentPlayer + 1) % 2
+    
+        const nextPlayer = (currentPlayer + 1) % 2;
         setCurrentPlayer(nextPlayer);
         setSelectedTile(null);
-
-        // Send updated game state to server
+    
         socket.emit('playWord', {
             board: newBoard,
             players: updatedPlayers,
             currentPlayer: nextPlayer
         });
     };
+    
 
     const handleExchange = () => {
         if (selectedTile && selectedTile.from.type === 'rack') {
@@ -348,6 +351,7 @@ function App() {
                                     {...provided.droppableProps}
                                     board={board}
                                     onTileClick={handleBoardTileClick}
+                                    isCurrentPlayerTurn={isCurrentPlayerTurn} // Pass isCurrentPlayerTurn to Board
                                 >
                                     {provided.placeholder}
                                 </Board>
