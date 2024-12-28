@@ -2,17 +2,14 @@ import React from 'react';
 import { Droppable } from 'react-beautiful-dnd';
 import Tile from '../Tile/Tile';
 
-const Board = ({ board, onTileClick, isCurrentPlayerTurn }) => {
+const Board = ({ board, onTileClick, isCurrentPlayerTurn, currentPlayer }) => {
     const handleTileClick = (rowIndex, colIndex) => {
-        // If it's not the current player's turn, don't allow tile clicks
-        if (!isCurrentPlayerTurn) {
-            return;
-        }
-    
-        if (board[rowIndex][colIndex].tile) {
-            const tile = board[rowIndex][colIndex].tile;
-            onTileClick(rowIndex, colIndex, tile);
-        } else {
+        if (!isCurrentPlayerTurn) return;
+        const cell = board[rowIndex][colIndex];
+        if (cell.tile && !cell.original) {
+            const tile = cell.tile;
+            onTileClick(rowIndex, colIndex, { ...tile, originalTileValue: tile });
+        } else if (!cell.tile) {
             onTileClick(rowIndex, colIndex, null);
         }
     };
@@ -40,7 +37,7 @@ const Board = ({ board, onTileClick, isCurrentPlayerTurn }) => {
                                     >
                                         {cell.tile ? (
                                             <Tile
-                                                value={isCurrentPlayerTurn || cell.original ? cell.tile : '?'} // Show '?' if not current player's turn and not original
+                                                value={cell.original || isCurrentPlayerTurn ? cell.tile : '?'}
                                                 isSelected={false}
                                             />
                                         ) : (

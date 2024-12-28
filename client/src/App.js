@@ -6,7 +6,7 @@ import Rack from './components/Rack/Rack';
 import Scoreboard from './components/Scoreboard/Scoreboard';
 import GameControls from './components/GameControls/GameControls';
 import Tile from './components/Tile/Tile';
-import { isValidWord, calculateScore } from './utils';
+import { isValidWord, calculateScore, drawTiles } from './utils';
 import './App.css';
 
 const SERVER_URL = 'http://localhost:8080';
@@ -23,6 +23,9 @@ function App() {
     const [selectedTile, setSelectedTile] = useState(null);
     const [gameStarted, setGameStarted] = useState(false);
     const [error, setError] = useState('');
+    const [potentialScore, setPotentialScore] = useState(0);
+    const [showBlankTileModal, setShowBlankTileModal] = useState(false);
+    const [blankTilePosition, setBlankTilePosition] = useState(null);
 
     useEffect(() => {
         const newSocket = io(SERVER_URL);
@@ -63,28 +66,25 @@ function App() {
 
     const handleRackTileClick = (tile, index) => {
         setSelectedTile({
-          tile,
-          from: {
-            type: 'rack',
-            index
-          }
+            tile,
+            from: {
+                type: 'rack',
+                index
+            }
         });
-      };
+    };
 
-      const handleBoardTileClick = (row, col, existingTile) => {
-        // Check if it's the current player's turn
-        if (!isCurrentPlayerTurn) {
-            return; // Do nothing if it's not the current player's turn
-        }
+    const handleBoardTileClick = (row, col, existingTile) => {
+        if (!isCurrentPlayerTurn) return;
     
         if (existingTile) {
-            // Remove tile from board and return to rack
             const newBoard = [...board];
-            newBoard[row][col] = { ...newBoard[row][col], tile: null };
+            const newTile = existingTile.originalTileValue ? { tile: existingTile.originalTileValue, original: false } : { tile: '_', original: false };
+            newBoard[row][col] = { ...newBoard[row][col], tile: null, original: false };
             setBoard(newBoard);
     
             const updatedPlayers = [...players];
-            updatedPlayers[currentPlayer].rack.push(existingTile);
+            updatedPlayers[currentPlayer].rack.push(newTile.tile);
             setPlayers(updatedPlayers);
             setSelectedTile(null);
     
@@ -94,12 +94,10 @@ function App() {
                 rack: updatedPlayers[currentPlayer].rack
             });
         } else if (selectedTile) {
-            // Place tile on board and remove from rack
             const newBoard = [...board];
-            newBoard[row][col] = { ...newBoard[row][col], tile: selectedTile.tile };
+            newBoard[row][col] = { ...newBoard[row][col], tile: selectedTile.tile, original: false };
             setBoard(newBoard);
     
-            // Remove the tile from the rack
             const updatedPlayers = [...players];
             const rackIndex = selectedTile.from.index;
             if (selectedTile.from.type === 'rack') {
@@ -115,80 +113,187 @@ function App() {
             setSelectedTile(null);
             socket.emit('updateBoard', newBoard);
         }
+    
+        updatePotentialScore();
     };
     
 
     const onDragEnd = (result) => {
         const { destination, source } = result;
-
+    
         if (!destination) return;
-
+    
         if (destination.droppableId === source.droppableId && destination.index === source.index) {
-            return; // Tile dropped in the same place
+            return;
         }
-
+    
         if (destination.droppableId === 'rack' && source.droppableId === 'rack') {
-            // Reorder tile within the rack
             const newRack = [...players[currentPlayer].rack];
             const [movedTile] = newRack.splice(source.index, 1);
             newRack.splice(destination.index, 0, movedTile);
-
+    
             const updatedPlayers = [...players];
             updatedPlayers[currentPlayer] = { ...players[currentPlayer], rack: newRack };
             setPlayers(updatedPlayers);
             socket.emit('updateRack', { playerId: currentPlayer, rack: newRack });
             return;
         }
-
+    
         if (source.droppableId === 'rack' && destination.droppableId.startsWith('cell-')) {
-            // Move tile from rack to board
             const [row, col] = destination.droppableId.split('-').slice(1).map(Number);
             const tile = players[currentPlayer].rack[source.index];
-
-            // Update board
+    
+            if (tile === '_') {
+                setShowBlankTileModal(true);
+                setBlankTilePosition({ row, col });
+    
+                const newRack = [...players[currentPlayer].rack];
+                const [movedTile] = newRack.splice(source.index, 1);
+    
+                const updatedPlayers = [...players];
+                updatedPlayers[currentPlayer] = { ...players[currentPlayer], rack: newRack };
+                setPlayers(updatedPlayers);
+                setSelectedTile({ tile: movedTile, from: { type: 'rack', index: source.index } });
+                return;
+            }
+    
             const newBoard = [...board];
-            newBoard[row][col] = { tile, bonus: newBoard[row][col].bonus };
+            newBoard[row][col] = { tile, bonus: newBoard[row][col].bonus, original: false };
             setBoard(newBoard);
-
-            // Update rack
+    
             const newRack = [...players[currentPlayer].rack];
             newRack.splice(source.index, 1);
-
-            // Update players
+    
             const updatedPlayers = [...players];
             updatedPlayers[currentPlayer] = { ...players[currentPlayer], rack: newRack };
             setPlayers(updatedPlayers);
-
-            // Send updates to server
+    
             socket.emit('updateBoard', newBoard);
             socket.emit('updateRack', { playerId: currentPlayer, rack: newRack });
-            return;
         }
-
+    
         if (source.droppableId.startsWith('cell-') && destination.droppableId === 'rack') {
-            // Move tile from board back to rack
             const [sourceRow, sourceCol] = source.droppableId.split('-').slice(1).map(Number);
             const tile = board[sourceRow][sourceCol].tile;
-
-            // Update board
+            const originalTileValue = board[sourceRow][sourceCol].originalTileValue;
+    
             const newBoard = [...board];
-            newBoard[sourceRow][sourceCol] = { tile: null, bonus: newBoard[sourceRow][sourceCol].bonus };
+            newBoard[sourceRow][sourceCol] = { tile: null, bonus: newBoard[sourceRow][sourceCol].bonus, original: false };
             setBoard(newBoard);
-
-            // Update rack
+    
             const newRack = [...players[currentPlayer].rack];
-            newRack.splice(destination.index, 0, tile);
-
-            // Update players
+            const newTile = originalTileValue ? originalTileValue : tile;
+            newRack.splice(destination.index, 0, newTile);
+    
             const updatedPlayers = [...players];
             updatedPlayers[currentPlayer] = { ...players[currentPlayer], rack: newRack };
             setPlayers(updatedPlayers);
-
-            // Send updates to server
+    
             socket.emit('updateBoard', newBoard);
             socket.emit('updateRack', { playerId: currentPlayer, rack: newRack });
-            return;
         }
+        updatePotentialScore();
+    };
+
+    const calculatePotentialScore = () => {
+        const playedTiles = [];
+        for (let i = 0; i < 15; i++) {
+            for (let j = 0; j < 15; j++) {
+                if (board[i][j].tile && !board[i][j].original) {
+                    playedTiles.push({ row: i, col: j, tile: board[i][j].tile });
+                }
+            }
+        }
+    
+        if (playedTiles.length === 0) {
+            return 0;
+        }
+    
+        let totalScore = 0;
+        let allWords = [];
+    
+        const isHorizontal = playedTiles.length === 1 || playedTiles.every(tile => tile.row === playedTiles[0].row);
+        const isVertical = playedTiles.length === 1 || playedTiles.every(tile => tile.col === playedTiles[0].col);
+    
+        playedTiles.sort((a, b) => isHorizontal ? a.col - b.col : a.row - b.row);
+    
+        const addWordAndScore = (newWord, tiles) => {
+            if (newWord.length > 1) {
+                allWords.push(newWord);
+                totalScore += calculateScore(tiles, board);
+            }
+        };
+    
+        let [startRow, startCol] = [playedTiles[0].row, playedTiles[0].col];
+        let word = "";
+        let wordTiles = [];
+    
+        const processWord = (currentRow, currentCol) => {
+            let tempWord = "";
+            let tempTiles = [];
+            let i = currentRow;
+            let j = currentCol;
+    
+            // Extend word in the negative direction
+            if (isHorizontal) {
+                while (j >= 0 && board[i][j].tile) {
+                    tempWord = board[i][j].tile + tempWord;
+                    tempTiles.unshift({ row: i, col: j, tile: board[i][j].tile });
+                    j--;
+                }
+            } else {
+                while (i >= 0 && board[i][j].tile) {
+                    tempWord = board[i][j].tile + tempWord;
+                    tempTiles.unshift({ row: i, col: j, tile: board[i][j].tile });
+                    i--;
+                }
+            }
+    
+            // Extend word in the positive direction, skipping the starting tile for words longer than 1 tile
+            if (isHorizontal) {
+                j = currentCol + 1;
+                while (j < 15 && board[i][j].tile) {
+                    tempWord += board[i][j].tile;
+                    tempTiles.push({ row: i, col: j, tile: board[i][j].tile });
+                    j++;
+                }
+            } else {
+                i = currentRow + 1;
+                while (i < 15 && board[i][j].tile) {
+                    tempWord += board[i][j].tile;
+                    tempTiles.push({ row: i, col: j, tile: board[i][j].tile });
+                    i++;
+                }
+            }
+    
+            // Add word and score if word length is greater than 1
+            if (tempWord.length > 1) {
+                addWordAndScore(tempWord, tempTiles);
+            }
+        };
+    
+        // Process the main word
+        if (isHorizontal) {
+            processWord(startRow, startCol);
+        } else {
+            processWord(startRow, startCol);
+        }
+    
+        // Process perpendicular words
+        for (let tile of playedTiles) {
+            if (isHorizontal) {
+                processWord(tile.row, tile.col, false);
+            } else {
+                processWord(tile.row, tile.col, true);
+            }
+        }
+    
+        return totalScore;
+    };
+
+    const updatePotentialScore = () => {
+        const score = calculatePotentialScore();
+        setPotentialScore(score);
     };
 
     const handlePlayWord = async () => {
@@ -216,57 +321,120 @@ function App() {
     
         playedTiles.sort((a, b) => isHorizontal ? a.col - b.col : a.row - b.row);
     
-        let word = "";
+        let allWords = [];
+        let totalScore = 0;
+    
+        const addWordAndScore = (newWord, tiles) => {
+            if (newWord.length > 1) {
+                allWords.push(newWord);
+                totalScore += calculateScore(tiles, board);
+            }
+        };
+    
+        const processWord = (currentRow, currentCol, isMainWord = false) => {
+            let tempWord = "";
+            let tempTiles = [];
+            let i = currentRow;
+            let j = currentCol;
+    
+            if (isMainWord) {
+                if (isHorizontal) {
+                    while (j >= 0 && board[i][j].tile) {
+                        j--;
+                    }
+                    j++;
+                    while (j < 15 && board[i][j].tile) {
+                        tempWord += board[i][j].tile;
+                        tempTiles.push({ row: i, col: j, tile: board[i][j].tile });
+                        j++;
+                    }
+                } else {
+                    while (i >= 0 && board[i][j].tile) {
+                        i--;
+                    }
+                    i++;
+                    while (i < 15 && board[i][j].tile) {
+                        tempWord += board[i][j].tile;
+                        tempTiles.push({ row: i, col: j, tile: board[i][j].tile });
+                        i++;
+                    }
+                }
+            } else {
+                if (!isHorizontal) {
+                    while (j >= 0 && board[i][j].tile) {
+                        j--;
+                    }
+                    j++;
+                    while (j < 15 && board[i][j].tile) {
+                        tempWord += board[i][j].tile;
+                        tempTiles.push({ row: i, col: j, tile: board[i][j].tile });
+                        j++;
+                    }
+                } else {
+                    while (i >= 0 && board[i][j].tile) {
+                        i--;
+                    }
+                    i++;
+                    while (i < 15 && board[i][j].tile) {
+                        tempWord += board[i][j].tile;
+                        tempTiles.push({ row: i, col: j, tile: board[i][j].tile });
+                        i++;
+                    }
+                }
+            }
+    
+            if (tempWord.length > 1) {
+                addWordAndScore(tempWord, tempTiles);
+            }
+        };
+    
         let [startRow, startCol] = [playedTiles[0].row, playedTiles[0].col];
+        processWord(startRow, startCol, true);
     
-        if (isHorizontal) {
-            let i = startCol;
-            while (i >= 0 && board[startRow][i].tile) {
-                startCol = i;
-                i--;
-            }
-            i = startCol;
-            while (i < 15 && board[startRow][i].tile) {
-                word += board[startRow][i].tile;
-                i++;
-            }
-        } else {
-            let i = startRow;
-            while (i >= 0 && board[i][startCol].tile) {
-                startRow = i;
-                i--;
-            }
-            i = startRow;
-            while (i < 15 && board[i][startCol].tile) {
-                word += board[i][startCol].tile;
-                i++;
+        for (let tile of playedTiles) {
+            if (isHorizontal) {
+                processWord(tile.row, tile.col, false);
+            } else {
+                processWord(tile.row, tile.col, false);
             }
         }
     
-        if (!(await isValidWord(word, board))) {
-            alert(`Invalid word: "${word}"`);
-            return;
+        for (let word of allWords) {
+            if (!(await isValidWord(word, board))) {
+                alert(`Invalid word: "${word}"`);
+                return;
+            }
         }
     
-        const score = calculateScore(playedTiles, board);
-    
-        const updatedPlayers = [...players];
-        updatedPlayers[currentPlayer].score += score;
-    
-        const newBoard = board.map(row => row.map(cell => ({ ...cell, original: cell.tile ? true : false })));
+        const newBoard = board.map(row => row.map(cell => ({
+            ...cell,
+            original: cell.original || (cell.tile !== null)
+        })));
         setBoard(newBoard);
     
         const nextPlayer = (currentPlayer + 1) % 2;
         setCurrentPlayer(nextPlayer);
         setSelectedTile(null);
+        setPotentialScore(0);
+    
+        let updatedPlayers = [...players];
+        const tilesToDraw = Math.max(0, 7 - updatedPlayers[currentPlayer].rack.length);
+        const newTiles = drawTiles(bag, tilesToDraw);
+        updatedPlayers[currentPlayer].rack = [...updatedPlayers[currentPlayer].rack, ...newTiles];
+    
+        setBag(bag.filter(tile => !newTiles.includes(tile)));
     
         socket.emit('playWord', {
             board: newBoard,
-            players: updatedPlayers,
-            currentPlayer: nextPlayer
+            players: updatedPlayers.map((player, index) =>
+                index === currentPlayer
+                    ? { ...player, score: player.score + totalScore }
+                    : player
+            ),
+            currentPlayer: nextPlayer,
+            bag: bag.filter(tile => !newTiles.includes(tile))
         });
     };
-    
 
     const handleExchange = () => {
         if (selectedTile && selectedTile.from.type === 'rack') {
@@ -275,18 +443,16 @@ function App() {
             const tileIndex = newRack.indexOf(tileToExchange);
 
             if (tileIndex > -1) {
-                newRack.splice(tileIndex, 1); // Remove tile from rack
+                newRack.splice(tileIndex, 1);
 
                 const updatedPlayers = [...players];
                 updatedPlayers[currentPlayer] = { ...players[currentPlayer], rack: newRack };
                 setPlayers(updatedPlayers);
-                setSelectedTile(null); // Clear selected tile
+                setSelectedTile(null);
 
-                // Switch to the next player
                 const nextPlayer = (currentPlayer + 1) % 2;
                 setCurrentPlayer(nextPlayer);
 
-                // Send updated game state to server, including the tile to exchange
                 socket.emit('exchangeTile', {
                     playerId: currentPlayer,
                     rack: newRack,
@@ -300,12 +466,10 @@ function App() {
     };
 
     const handlePass = () => {
-        // Switch to the next player
         const nextPlayer = (currentPlayer + 1) % 2
         setCurrentPlayer(nextPlayer);
         setSelectedTile(null);
 
-        // Send updated game state to server
         socket.emit('passTurn', {
             currentPlayer: nextPlayer
         });
@@ -315,21 +479,45 @@ function App() {
         const currentRack = [...players[currentPlayer].rack];
         for (let i = currentRack.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-            [currentRack[i], currentRack[j]] = [currentRack[j], currentRack[i]]; // Swap
+            [currentRack[i], currentRack[j]] = [currentRack[j], currentRack[i]];
         }
 
         const updatedPlayers = [...players];
         updatedPlayers[currentPlayer] = { ...players[currentPlayer], rack: currentRack };
         setPlayers(updatedPlayers);
 
-        // Send updated game state to server
         socket.emit('shuffleRack', {
             playerId: currentPlayer,
             rack: currentRack
         });
     };
 
-    // Determine if it's the current player's turn based on currentPlayer from server
+    const handleSelectBlankTile = (letter) => {
+        if (blankTilePosition) {
+            if (blankTilePosition.from === 'rack') {
+                // Update the tile in the rack
+                const updatedPlayers = [...players];
+                const rackIndex = selectedTile.from.index;
+                updatedPlayers[currentPlayer].rack[rackIndex] = letter;
+                setPlayers(updatedPlayers);
+                setSelectedTile({ tile: letter, from: { type: 'rack', index: rackIndex } });
+            } else {
+                // Update the tile on the board
+                const { row, col } = blankTilePosition;
+                const newBoard = [...board];
+                newBoard[row][col] = { ...newBoard[row][col], tile: letter, original: false };
+                setBoard(newBoard);
+                updatePotentialScore();
+    
+                // Emit updateBoard event to the server
+                socket.emit('updateBoard', newBoard);
+            }
+            // Close the modal
+            setShowBlankTileModal(false);
+            setBlankTilePosition(null);
+        }
+    };
+
     const isCurrentPlayerTurn = socket && players[currentPlayer].socketId === socket.id;
 
     return (
@@ -342,8 +530,11 @@ function App() {
                     <div className="turn-indicator">
                         {isCurrentPlayerTurn ? "Your Turn" : "Waiting for Opponent"}
                     </div>
+                    <Scoreboard players={players} currentPlayer={currentPlayer} />
+                    <div className="potential-score">
+                        Potential Score: {potentialScore}
+                    </div>
                     <DragDropContext onDragEnd={onDragEnd}>
-                        <Scoreboard players={players} currentPlayer={currentPlayer} />
                         <Droppable droppableId="board">
                             {(provided) => (
                                 <Board
@@ -351,7 +542,8 @@ function App() {
                                     {...provided.droppableProps}
                                     board={board}
                                     onTileClick={handleBoardTileClick}
-                                    isCurrentPlayerTurn={isCurrentPlayerTurn} // Pass isCurrentPlayerTurn to Board
+                                    isCurrentPlayerTurn={isCurrentPlayerTurn}
+                                    currentPlayer={currentPlayer}
                                 >
                                     {provided.placeholder}
                                 </Board>
@@ -362,11 +554,11 @@ function App() {
                                 <Rack
                                     innerRef={provided.innerRef}
                                     {...provided.droppableProps}
-                                    rack={players[currentPlayer].rack}
+                                    rack={isCurrentPlayerTurn ? players[currentPlayer].rack : players[(currentPlayer + 1) % 2].rack}
                                     onTileClick={handleRackTileClick}
                                     selectedTile={selectedTile}
                                 >
-                                    {players[currentPlayer].rack.map((tile, index) => (
+                                    {isCurrentPlayerTurn && players[currentPlayer].rack.map((tile, index) => (
                                         <Tile
                                             key={index}
                                             draggableId={`tile-${index}`}
@@ -388,6 +580,26 @@ function App() {
                             disabled={!isCurrentPlayerTurn}
                         />
                     </DragDropContext>
+                    {showBlankTileModal && (
+                        <div className="modal-container">
+                            <div className="modal-content">
+                                <h2>Select a Letter for the Blank Tile</h2>
+                                <div className="alphabet-grid">
+                                    {Array.from({ length: 26 }, (_, i) => {
+                                        const letter = String.fromCharCode(65 + i);
+                                        return (
+                                            <button
+                                                key={letter}
+                                                onClick={() => handleSelectBlankTile(letter)}
+                                            >
+                                                {letter}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </>
             )}
         </div>
