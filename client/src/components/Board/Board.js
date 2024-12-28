@@ -43,7 +43,7 @@ const Board = ({ board, onTileClick }) => {
                     ) : (
                       <>
                         {rowIndex === 7 && colIndex === 7 ? (
-                          <span className="text-rose-600 text-xl">★</span>
+                          <span className="bg-pink-300 text-pink-900 hover:bg-pink-200">★</span>
                         ) : (
                           cell.bonus && (
                             <div className="text-[8px] leading-none text-center font-medium">

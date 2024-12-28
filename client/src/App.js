@@ -15,8 +15,8 @@ function App() {
     const [socket, setSocket] = useState(null);
     const [board, setBoard] = useState([]);
     const [players, setPlayers] = useState([
-        { score: 0, rack: [] },
-        { score: 0, rack: [] }
+        { score: 0, rack: [], socketId: null },
+        { score: 0, rack: [], socketId: null }
     ]);
     const [currentPlayer, setCurrentPlayer] = useState(0);
     const [bag, setBag] = useState([]);
@@ -34,6 +34,7 @@ function App() {
         });
 
         newSocket.on('gameUpdate', (gameState) => {
+            console.log("gameUpdate received:", gameState);
             setBoard(gameState.board);
             setPlayers(gameState.players);
             setCurrentPlayer(gameState.currentPlayer);
@@ -50,13 +51,11 @@ function App() {
         });
 
         newSocket.on('rackUpdate', ({ playerId, rack }) => {
-            if (playerId === currentPlayer) {
-                setPlayers(prevPlayers => {
-                    const newPlayers = [...prevPlayers];
-                    newPlayers[playerId] = { ...newPlayers[playerId], rack };
-                    return newPlayers;
-                });
-            }
+            setPlayers(prevPlayers => {
+                const newPlayers = [...prevPlayers];
+                newPlayers[playerId] = { ...newPlayers[playerId], rack };
+                return newPlayers;
+            });
         });
 
         return () => newSocket.close();
@@ -238,7 +237,7 @@ function App() {
 
         // 5. Validate the word
         if (!(await isValidWord(word, board))) {
-            alert("Invalid word.");
+            alert(`Invalid word: "${word}"`); // Show the attempted word
             return;
         }
 
@@ -327,56 +326,65 @@ function App() {
         });
     };
 
+    // Determine if it's the current player's turn based on currentPlayer from server
+    const isCurrentPlayerTurn = socket && players[currentPlayer].socketId === socket.id;
+
     return (
         <div className="app">
             <h1>Scrabble Game</h1>
             {error && <div className="error">{error}</div>}
             {!gameStarted && <div>Waiting for another player...</div>}
             {gameStarted && (
-                <DragDropContext onDragEnd={onDragEnd}>
-                    <Scoreboard players={players} currentPlayer={currentPlayer} />
-                    <Droppable droppableId="board">
-                        {(provided) => (
-                            <Board
-                                innerRef={provided.innerRef}
-                                {...provided.droppableProps}
-                                board={board}
-                                onTileClick={handleBoardTileClick}
-                            >
-                                {provided.placeholder}
-                            </Board>
-                        )}
-                    </Droppable>
-                    <Droppable droppableId="rack" direction="horizontal">
-                        {(provided) => (
-                            <Rack
-                                innerRef={provided.innerRef}
-                                {...provided.droppableProps}
-                                rack={players[currentPlayer].rack}
-                                onTileClick={handleRackTileClick}
-                                selectedTile={selectedTile}
-                            >
-                                {players[currentPlayer].rack.map((tile, index) => (
-                                    <Tile
-                                        key={index}
-                                        draggableId={`tile-${index}`}
-                                        index={index}
-                                        value={tile}
-                                        isSelected={selectedTile && selectedTile.tile === tile && selectedTile.from.type === 'rack' && selectedTile.from.index === index}
-                                        onTileClick={() => handleRackTileClick(tile, index)}
-                                    />
-                                ))}
-                                {provided.placeholder}
-                            </Rack>
-                        )}
-                    </Droppable>
-                    <GameControls
-                        onPlay={handlePlayWord}
-                        onExchange={handleExchange}
-                        onPass={handlePass}
-                        onShuffle={handleShuffle}
-                    />
-                </DragDropContext>
+                <>
+                    <div className="turn-indicator">
+                        {isCurrentPlayerTurn ? "Your Turn" : "Waiting for Opponent"}
+                    </div>
+                    <DragDropContext onDragEnd={onDragEnd}>
+                        <Scoreboard players={players} currentPlayer={currentPlayer} />
+                        <Droppable droppableId="board">
+                            {(provided) => (
+                                <Board
+                                    innerRef={provided.innerRef}
+                                    {...provided.droppableProps}
+                                    board={board}
+                                    onTileClick={handleBoardTileClick}
+                                >
+                                    {provided.placeholder}
+                                </Board>
+                            )}
+                        </Droppable>
+                        <Droppable droppableId="rack" direction="horizontal">
+                            {(provided) => (
+                                <Rack
+                                    innerRef={provided.innerRef}
+                                    {...provided.droppableProps}
+                                    rack={players[currentPlayer].rack}
+                                    onTileClick={handleRackTileClick}
+                                    selectedTile={selectedTile}
+                                >
+                                    {players[currentPlayer].rack.map((tile, index) => (
+                                        <Tile
+                                            key={index}
+                                            draggableId={`tile-${index}`}
+                                            index={index}
+                                            value={tile}
+                                            isSelected={selectedTile && selectedTile.tile === tile && selectedTile.from.type === 'rack' && selectedTile.from.index === index}
+                                            onTileClick={() => handleRackTileClick(tile, index)}
+                                        />
+                                    ))}
+                                    {provided.placeholder}
+                                </Rack>
+                            )}
+                        </Droppable>
+                        <GameControls
+                            onPlay={handlePlayWord}
+                            onExchange={handleExchange}
+                            onPass={handlePass}
+                            onShuffle={handleShuffle}
+                            disabled={!isCurrentPlayerTurn}
+                        />
+                    </DragDropContext>
+                </>
             )}
         </div>
     );

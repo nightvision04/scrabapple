@@ -97,8 +97,8 @@ const drawTiles = (bag, num) => {
 let gameState = {
     board: createEmptyBoard(),
     players: [
-        { score: 0, rack: [] },
-        { score: 0, rack: [] }
+        { score: 0, rack: [], socketId: null },
+        { score: 0, rack: [], socketId: null }
     ],
     currentPlayer: 0,
     bag: createTileBag(),
@@ -134,6 +134,7 @@ io.on('connection', (socket) => {
         if (connectedPlayers <= 2) {
             const playerId = gameState.players.findIndex(player => player.rack.length === 0);
             if (playerId !== -1) {
+                gameState.players[playerId].socketId = socket.id; // Assign socketId here
                 gameState.players[playerId].rack = drawTiles(gameState.bag, 7);
                 sendGameStateToPlayer(socket, playerId);
             }
@@ -198,8 +199,8 @@ io.on('connection', (socket) => {
             gameState = {
                 board: createEmptyBoard(),
                 players: [
-                    { score: 0, rack: [] },
-                    { score: 0, rack: [] }
+                    { score: 0, rack: [], socketId: null },
+                    { score: 0, rack: [], socketId: null }
                 ],
                 currentPlayer: 0,
                 bag: createTileBag(),
