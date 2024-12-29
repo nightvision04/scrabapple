@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
 import { DragDropContext, Droppable } from 'react-beautiful-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -40,6 +40,12 @@ function App() {
     const [blankTilePosition, setBlankTilePosition] = useState(null);
     const [turnEndScore, setTurnEndScore] = useState(0);
     const [showStarEffects, setShowStarEffects] = useState(false);
+    const [playEndTurnAudio, setPlayEndTurnAudio] = useState(false);
+
+    // Create audio objects once and reuse them
+    const tapSelectAudio = useRef(new Audio('/tap-select.mp3')).current;
+    const tapPlaceAudio = useRef(new Audio('/tap-place.mp3')).current;
+    const endTurnAudio = useRef(new Audio('/stars.mp3')).current;
 
     useEffect(() => {
         const newSocket = io(SERVER_URL);
@@ -78,9 +84,19 @@ function App() {
         return () => newSocket.close();
     }, []);
 
+    useEffect(() => {
+        if (playEndTurnAudio) {
+            endTurnAudio.currentTime = 0; // Reset sound to start
+            endTurnAudio.play().catch(error => {
+                console.error("Error playing audio:", error);
+            });
+            setPlayEndTurnAudio(false); // Reset the trigger
+        }
+    }, [playEndTurnAudio]);
+
     const handleRackTileClick = (tile, index) => {
-        // Play tap-select sound
-        const tapSelectAudio = new Audio('/tap-select.mp3');
+        // Play tap-select sound using the pre-created audio object
+        tapSelectAudio.currentTime = 0; // Reset sound to start
         tapSelectAudio.play().catch(error => {
             console.error("Error playing audio:", error);
         });
@@ -134,8 +150,8 @@ function App() {
                 });
             }
         } else if (selectedTile) {
-            // Play tap-place sound
-            const tapPlaceAudio = new Audio('/tap-place.mp3');
+            // Play tap-place sound using the pre-created audio object
+            tapPlaceAudio.currentTime = 0; // Reset sound to start
             tapPlaceAudio.play().catch(error => {
                 console.error("Error playing audio:", error);
             });
@@ -472,22 +488,17 @@ function App() {
         // Set the turn end score
         setTurnEndScore(totalScore);
 
-        // Show star effects
+        // Trigger star effects and audio
         setShowStarEffects(true);
+        setPlayEndTurnAudio(true);
 
-        // Play sound immediately
-        const endTurnAudio = new Audio('/stars_stereo.mp3');
-        endTurnAudio.play().catch(error => {
-            console.error("Error playing audio:", error);
-        });
-
-        // Delay for animation and then switch to the next player
+        // Delay for star animation and then switch to the next player
         setTimeout(() => {
+            setShowStarEffects(false); // Hide star effects
             const nextPlayer = (currentPlayer + 1) % 2;
             setCurrentPlayer(nextPlayer);
             setSelectedTile(null);
             setPotentialScore(0);
-            setShowStarEffects(false);
 
             let updatedPlayers = [...players];
             const tilesToDraw = Math.max(0, 7 - updatedPlayers[currentPlayer].rack.length);
@@ -508,7 +519,7 @@ function App() {
                 currentPlayer: nextPlayer,
                 bag: bag.filter(tile => !newTiles.includes(tile))
             });
-        }, 1500);
+        }, 1500); //increased delay slightly to allow for full star animation
     };
 
     const handleExchange = () => {
@@ -658,7 +669,7 @@ function App() {
                     <YourTurnEffect isCurrentPlayerTurn={isCurrentPlayerTurn} />
 
                     {/* Show star effects at the end of the turn */}
-                    {showStarEffects && <StarEffects />}
+                    <StarEffects isComplete={showStarEffects} setIsComplete={setShowStarEffects}/>
                     <Scoreboard players={players} currentPlayer={currentPlayer} />
 
                     <div className="potential-score text-xs">

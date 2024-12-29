@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaStar } from 'react-icons/fa';
+import { Star } from 'lucide-react';
 
 const randomRange = (min, max) => Math.random() * (max - min) + min;
 const randomChoice = (arr) => arr[Math.floor(Math.random() * arr.length)];
@@ -9,7 +9,7 @@ const starColors = [
   'text-orange-400'
 ];
 
-const starSizes = ['text-2xl', 'text-3xl', 'text-4xl'];
+const starSizes = ['h-4 w-4', 'h-6 w-6', 'h-8 w-8'];
 
 // Constants for physics simulation
 const GRAVITY = 1200; // pixels per second squared
@@ -26,7 +26,7 @@ const StarParticle = ({ onComplete }) => {
     const angle = randomRange(-Math.PI/3, Math.PI/3);
     
     // Initial velocity components
-    const initialVelocity = randomRange(250, 350); // pixels per second
+    const initialVelocity = randomRange(250, 350);
     const vx = Math.sin(angle) * initialVelocity;
     const vy = -Math.cos(angle) * initialVelocity;
     
@@ -65,9 +65,9 @@ const StarParticle = ({ onComplete }) => {
     keyframes += '}';
     
     setStyle({
-      className: `absolute ${color} ${size} border border-amber-900`,
+      className: `absolute ${color} ${size}`,
       style: {
-        animation: `${animationName} ${TOTAL_DURATION}s cubic-bezier(0.22, 1, 0.36, 1) forwards`
+        animation: `${animationName} ${TOTAL_DURATION}s cubic-bezier(0.22, 1, 0.36, 1) 1 forwards`
       }
     });
 
@@ -88,46 +88,48 @@ const StarParticle = ({ onComplete }) => {
 
   return (
     <div {...style}>
-      <FaStar />
+      <Star className="animate-pulse" fill="currentColor" />
     </div>
   );
 };
 
-const StarEffects = () => {
-  const [bursts, setBursts] = useState([]);
+const StarEffects = ({ isComplete, setIsComplete }) => {
+  const [burst, setBurst] = useState(null);
   
-  const createBurst = () => {
-    const newBurst = {
-      id: Math.random().toString(36).substr(2, 9),
-      stars: Array.from({ length: randomRange(8, 12) }, () => ({
-        id: Math.random().toString(36).substr(2, 9)
-      }))
-    };
-    
-    setBursts(prev => [...prev, newBurst]);
-    
-    setTimeout(() => {
-      setBursts(prev => prev.filter(b => b.id !== newBurst.id));
-    }, TOTAL_DURATION * 1000);
-  };
-
   useEffect(() => {
-    const interval = setInterval(createBurst, 2000);
-    return () => clearInterval(interval);
-  }, []);
+    if (isComplete && !burst) {
+      // Create a single burst when isComplete becomes true
+      const newBurst = {
+        id: Math.random().toString(36).substr(2, 9),
+        stars: Array.from({ length: randomRange(8, 12) }, () => ({
+          id: Math.random().toString(36).substr(2, 9)
+        }))
+      };
+      setBurst(newBurst);
+      
+      // Set isComplete to false after the animation duration
+      const timer = setTimeout(() => {
+        setIsComplete(false);
+        setBurst(null);
+      }, TOTAL_DURATION * 1000); // Match the animation duration
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isComplete, setIsComplete]);
+
+  // Prevent re-rendering during animation
+  if (!burst || !isComplete) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden pointer-events-none">
-      {bursts.map(burst => (
-        <div key={burst.id} className="absolute">
-          {burst.stars.map(star => (
-            <StarParticle
-              key={star.id}
-              onComplete={() => {}}
-            />
-          ))}
-        </div>
-      ))}
+      <div className="absolute">
+        {burst.stars.map(star => (
+          <StarParticle
+            key={star.id}
+            onComplete={() => {}}
+          />
+        ))}
+      </div>
     </div>
   );
 };
