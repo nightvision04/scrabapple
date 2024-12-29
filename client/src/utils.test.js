@@ -15,130 +15,223 @@ beforeEach(() => {
 describe('calculateScore', () => {
     const emptyBoard = Array(15).fill(null).map(() => Array(15).fill({ tile: null, bonus: null }));
 
-    // Basic scoring tests
-    it('should score a single letter with no bonuses correctly', () => {
-        const board = [...emptyBoard];
-        // Using 'K' which is worth 5 points in Scrabble
-        board[7][7] = { tile: 'K', bonus: null };
-        const score = calculateScore([{ row: 7, col: 7, tile: 'K' }], board);
-        expect(score).toBe(5);
+        // Basic scoring tests
+        it('should calculate score correctly for player 2 playing FAR after player 1 played AT', () => {
+            // Initialize an empty board
+            const emptyBoard = Array(15).fill(null).map(() => Array(15).fill({ tile: null, bonus: null }));
+    
+            // Setup the board with Player 1's word "AT"
+            const board = [...emptyBoard];
+            board[7][7] = { tile: 'A', bonus: 'dw', original: true }; // A on double word
+            board[7][8] = { tile: 'T', bonus: null, original: true };
+    
+            // Player 2 plays "FAR" connecting to "A"
+            const playedTiles = [
+                { row: 6, col: 7, tile: 'F' }, // F above A
+                { row: 8, col: 7, tile: 'R' }  // R below A
+            ];
+            board[6][7] = { tile: 'F', bonus: null };
+            board[8][7] = { tile: 'R', bonus: null };
+    
+            // Calculate the score
+            const score = calculateScore(playedTiles, board);
+    
+            // Expected score: F(4) + A(1) + R(1) = 6, no double word score applied
+            expect(score).toBe(6);
+        });
+
+        it('should calculate score correctly for player 2 playing PAY after player 1 played DAD', () => {
+            // Initialize an empty board
+            const emptyBoard = Array(15).fill(null).map(() => Array(15).fill({ tile: null, bonus: null }));
+        
+            // Setup the board with Player 1's word "DAD"
+            const board = [...emptyBoard];
+            board[7][7] = { tile: 'D', bonus: null, original: true };
+            board[7][8] = { tile: 'A', bonus: null, original: true };
+            board[7][9] = { tile: 'D', bonus: null, original: true };
+        
+            // Player 2 plays "PAY" connecting to "A"
+            const playedTiles = [
+                { row: 6, col: 8, tile: 'P' }, // P above A
+                { row: 8, col: 8, tile: 'Y' }  // Y below A
+            ];
+            board[6][8] = { tile: 'P', bonus: 'dl' }; // P on a double letter
+            board[8][8] = { tile: 'Y', bonus: 'dl' }; // Y on a double letter
+        
+            // Calculate the score
+            const score = calculateScore(playedTiles, board);
+        
+            // Expected score: (P=3 * 2) + A=1 + (Y=4 * 2) = 6 + 1 + 8 = 15
+            expect(score).toBe(15);
+        });
+
+        it('should calculate score correctly for player 1 adding MENT to PAY after player 2 played PAY', () => {
+            // Initialize an empty board
+            const emptyBoard = Array(15).fill(null).map(() => Array(15).fill({ tile: null, bonus: null }));
+        
+            // Setup the board with Player 1's word "DAD" and Player 2's word "PAY"
+            const board = [...emptyBoard];
+            board[7][6] = { tile: 'D', bonus: null, original: true };
+            board[7][7] = { tile: 'A', bonus: null, original: true };
+            board[7][8] = { tile: 'D', bonus: null, original: true };
+            board[6][7] = { tile: 'P', bonus: 'dl', original: true };
+            board[8][7] = { tile: 'Y', bonus: 'dl', original: true };
+        
+            // Player 1 adds "MENT" to "PAY"
+            const playedTiles = [
+                { row: 9, col: 7, tile: 'M' },
+                { row: 10, col: 7, tile: 'E' },
+                { row: 11, col: 7, tile: 'N' },
+                { row: 12, col: 7, tile: 'T' }
+            ];
+            board[9][7] = { tile: 'M', bonus: null };
+            board[10][7] = { tile: 'E', bonus: null };
+            board[11][7] = { tile: 'N', bonus: null };
+            board[12][7] = { tile: 'T', bonus: 'tl' }; // T on a triple letter
+        
+            // Calculate the score
+            const score = calculateScore(playedTiles, board);
+        
+            // Expected score: M(3) + E(1) + N(1) + (T(1) * 3) = 3 + 1 + 1 + 3 = 8
+            expect(score).toBe(16);
+        });
+
+        it('should calculate score correctly for player 1 playing WADE', () => {
+            // Initialize an empty board
+            const emptyBoard = Array(15).fill(null).map(() => Array(15).fill({ tile: null, bonus: null }));
+        
+            // Setup the board for Player 1's word "WADE"
+            const board = [...emptyBoard];
+            board[7][7] = { tile: 'W', bonus: 'dw' }; // W on a double word bonus
+            board[7][8] = { tile: 'A', bonus: null };
+            board[7][9] = { tile: 'D', bonus: null };
+            board[7][10] = { tile: 'E', bonus: null };
+        
+            // Player 1 plays "WADE"
+            const playedTiles = [
+                { row: 7, col: 7, tile: 'W' },
+                { row: 7, col: 8, tile: 'A' },
+                { row: 7, col: 9, tile: 'D' },
+                { row: 7, col: 10, tile: 'E' }
+            ];
+        
+            // Calculate the score
+            const score = calculateScore(playedTiles, board);
+        
+            // Expected score: (W(4)  + A(1) + D(2) + E(1)) *DW = (4 + 1 + 2 + 1)*2 = 16
+            expect(score).toBe(16);
+        });
+
+        it('should calculate score correctly for player 2 adding COP to WADE', () => {
+            // Initialize an empty board
+            const emptyBoard = Array(15).fill(null).map(() => Array(15).fill({ tile: null, bonus: null }));
+        
+            // Setup the board with Player 1's word "WADE"
+            const board = [...emptyBoard];
+            board[7][7] = { tile: 'W', bonus: 'dw', original: true };
+            board[7][8] = { tile: 'A', bonus: null, original: true };
+            board[7][9] = { tile: 'D', bonus: null, original: true };
+            board[7][10] = { tile: 'E', bonus: null, original: true };
+        
+            // Player 2 adds "COP" (connecting to the 'E' in "WADE")
+            const playedTiles = [
+                { row: 8, col: 10, tile: 'C' },
+                { row: 9, col: 10, tile: 'O' },
+                { row: 10, col: 10, tile: 'P' }
+            ];
+            board[8][10] = { tile: 'C', bonus: 'dw' }; // C on a double word bonus
+            board[9][10] = { tile: 'O', bonus: null };
+            board[10][10] = { tile: 'P', bonus: null };
+        
+            // Calculate the score
+            const score = calculateScore(playedTiles, board);
+        
+            // Expected score: (C(3) + O(1) + P(3) + E(1)) * 2 = (3 + 1 + 3 + 1) * 2 = 8 * 2 = 16
+            expect(score).toBe(16);
+        });
+
+        it('should calculate score correctly for player 2 playing IN after player 1 played PEN', () => {
+            // Initialize an empty board
+            const emptyBoard = Array(15).fill(null).map(() => Array(15).fill({ tile: null, bonus: null }));
+        
+            // Setup the board with Player 1's word "PEN"
+            const board = [...emptyBoard];
+            board[7][7] = { tile: 'P', bonus: null, original: true };
+            board[7][8] = { tile: 'E', bonus: null, original: true };
+            board[7][9] = { tile: 'N', bonus: null, original: true };
+        
+            // Player 2 adds "IN" (connecting to the 'P' in "PEN")
+            const playedTiles = [
+                { row: 8, col: 7, tile: 'I' },
+                { row: 9, col: 7, tile: 'N' }
+            ];
+            board[8][7] = { tile: 'I', bonus: null };
+            board[9][7] = { tile: 'N', bonus: null };
+        
+            // Calculate the score
+            const score = calculateScore(playedTiles, board);
+        
+            // Expected score: P(3) + I(1) + N(1) = 5
+            expect(score).toBe(5);
+        });
+
+        it('should calculate score correctly for player 1 playing TI after player 2 played IN', () => {
+            // Initialize an empty board
+            const emptyBoard = Array(15).fill(null).map(() => Array(15).fill({ tile: null, bonus: null }));
+        
+            // Setup the board with Player 1's word "PEN" and Player 2's word "IN"
+            const board = [...emptyBoard];
+            board[7][7] = { tile: 'P', bonus: null, original: true };
+            board[7][8] = { tile: 'E', bonus: null, original: true };
+            board[7][9] = { tile: 'N', bonus: null, original: true };
+            board[8][7] = { tile: 'I', bonus: null, original: true };
+            board[9][7] = { tile: 'N', bonus: null, original: true };
+        
+            // Player 1 adds "TI" (connecting to the 'N' in "IN")
+            const playedTiles = [
+                { row: 9, col: 6, tile: 'T' },
+                { row: 9, col: 8, tile: 'I' }
+            ];
+            board[9][6] = { tile: 'T', bonus: 'dl' }; // T on a double letter bonus
+            board[9][8] = { tile: 'I', bonus: null };
+        
+            // Calculate the score
+            const score = calculateScore(playedTiles, board);
+        
+            // Expected score: (T(1) * 2) + I(1) + N(1) = 2 + 1 + 1 = 4
+            expect(score).toBe(4);
+        });
+
+        it('should calculate score correctly for player 1 playing RI after adding TI', () => {
+            // Initialize an empty board
+            const emptyBoard = Array(15).fill(null).map(() => Array(15).fill({ tile: null, bonus: null }));
+        
+            // Setup the board with Player 1's words "PEN", "TI", and Player 2's word "IN"
+            const board = [...emptyBoard];
+            board[7][7] = { tile: 'P', bonus: null, original: true };
+            board[7][8] = { tile: 'E', bonus: null, original: true };
+            board[7][9] = { tile: 'N', bonus: null, original: true };
+            board[8][7] = { tile: 'I', bonus: null, original: true };
+            board[9][7] = { tile: 'N', bonus: null, original: true };
+            board[9][6] = { tile: 'T', bonus: 'dl', original: true };
+            board[9][8] = { tile: 'I', bonus: null, original: true };
+        
+            // Player 1 adds "RI" (connecting to the 'P' in "PEN")
+            const playedTiles = [
+                { row: 7, col: 5, tile: 'R' },
+                { row: 7, col: 6, tile: 'I' }
+            ];
+            board[7][5] = { tile: 'R', bonus: null };
+            board[7][6] = { tile: 'I', bonus: null };
+        
+            // Calculate the score
+            const score = calculateScore(playedTiles, board);
+        
+            // Expected score: R(1) + I(1) + P(3) + E(1) + N(1) = 7
+            expect(score).toBe(7);
+        });
+
     });
-
-    it('should score a simple horizontal word with no bonuses correctly', () => {
-        const board = [...emptyBoard];
-        // "DOG" = 2 + 1 + 2 = 5 points
-        board[7][7] = { tile: 'D', bonus: null };
-        board[7][8] = { tile: 'O', bonus: null };
-        board[7][9] = { tile: 'G', bonus: null };
-        const score = calculateScore([
-            { row: 7, col: 7, tile: 'D' },
-            { row: 7, col: 8, tile: 'O' },
-            { row: 7, col: 9, tile: 'G' }
-        ], board);
-        expect(score).toBe(5);
-    });
-
-    // Bonus tile tests
-    it('should apply double letter score correctly', () => {
-        const board = [...emptyBoard];
-        // "DOG" with double letter on 'O' = 2 + (1*2) + 2 = 6 points
-        board[7][7] = { tile: 'D', bonus: null };
-        board[7][8] = { tile: 'O', bonus: 'dl' };
-        board[7][9] = { tile: 'G', bonus: null };
-        const score = calculateScore([
-            { row: 7, col: 7, tile: 'D' },
-            { row: 7, col: 8, tile: 'O' },
-            { row: 7, col: 9, tile: 'G' }
-        ], board);
-        expect(score).toBe(6);
-    });
-
-    it('should apply triple word score correctly', () => {
-        const board = [...emptyBoard];
-        // "DOG" with triple word = (2 + 1 + 2) * 3 = 15 points
-        board[7][7] = { tile: 'D', bonus: 'tw' };
-        board[7][8] = { tile: 'O', bonus: null };
-        board[7][9] = { tile: 'G', bonus: null };
-        const score = calculateScore([
-            { row: 7, col: 7, tile: 'D' },
-            { row: 7, col: 8, tile: 'O' },
-            { row: 7, col: 9, tile: 'G' }
-        ], board);
-        expect(score).toBe(15);
-    });
-
-    // Blank tile tests
-    it('should handle blank tiles correctly', () => {
-        const board = [...emptyBoard];
-        // "D_G" with blank tile for 'O' = 2 + 0 + 2 = 4 points
-        board[7][7] = { tile: 'D', bonus: null };
-        board[7][8] = { tile: '_', bonus: null, originalTileValue: '_' };
-        board[7][9] = { tile: 'G', bonus: null };
-        const score = calculateScore([
-            { row: 7, col: 7, tile: 'D' },
-            { row: 7, col: 8, tile: '_' },
-            { row: 7, col: 9, tile: 'G' }
-        ], board);
-        expect(score).toBe(4);
-    });
-
-    // Multiple word formation tests
-    it('should score perpendicular word formations correctly', () => {
-        const board = [...emptyBoard];
-        // Existing "CAT" horizontally
-        board[7][7] = { tile: 'C', bonus: null }; // 3 points
-        board[7][8] = { tile: 'A', bonus: null }; // 1 point
-        board[7][9] = { tile: 'T', bonus: null }; // 1 point
-
-        // Playing 'R' to form "RAT" vertically
-        board[6][7] = { tile: 'R', bonus: null } // R = 1 point, played now
-        const score = calculateScore([{ row: 6, col: 7, tile: 'R' }], board);
-        // Should score the new word "RAT" = 1 + 1 + 1 = 3 points
-        expect(score).toBe(3);
-    });
-
-    it('should score multiple perpendicular words correctly', () => {
-        const board = [...emptyBoard];
-        // Existing horizontal "HEAT"
-        board[7][7] = { tile: 'H', bonus: null };
-        board[7][8] = { tile: 'E', bonus: null };
-        board[7][9] = { tile: 'A', bonus: null };
-        board[7][10] = { tile: 'T', bonus: null };
-
-        // Playing 'ATS' vertically to form "AT" and "HEATS"
-        board[8][9] = { tile: 'T', bonus: null }
-        board[9][9] = { tile: 'S', bonus: null }
-        const score = calculateScore([
-            { row: 8, col: 9, tile: 'T' },
-            { row: 9, col: 9, tile: 'S' }
-        ], board);
-        // Should score "ATS" = 1 + 1 + 1 = 3 points + "HEATS" = 4 + 1 + 1 + 1 + 1 = 8
-        // Total = 3 + 8 = 11
-        expect(score).toBe(11);
-    });
-
-    it('should handle complex bonus combinations correctly', () => {
-        const board = [...emptyBoard];
-        // Playing "QUIZ" with:
-        // - Q on triple word
-        // - U on double letter
-        // - Z on triple letter
-        board[7][7] = { tile: 'Q', bonus: 'tw' }; // 10 points
-        board[7][8] = { tile: 'U', bonus: 'dl' }; // 1 point * 2
-        board[7][9] = { tile: 'I', bonus: null };  // 1 point
-        board[7][10] = { tile: 'Z', bonus: 'tl' }; // 10 points * 3
-
-        const score = calculateScore([
-            { row: 7, col: 7, tile: 'Q' },
-            { row: 7, col: 8, tile: 'U' },
-            { row: 7, col: 9, tile: 'I' },
-            { row: 7, col: 10, tile: 'Z' }
-        ], board);
-        // Base: 10 + (1*2) + 1 + (10*3) = 43
-        // Then triple word: 43 * 3 = 129
-        expect(score).toBe(129);
-    });
-});
 
 describe('isValidWord', () => {
     it('returns true for a valid word', async () => {

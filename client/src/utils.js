@@ -55,93 +55,73 @@ export const isValidWord = async (word, board) => {
     }
 };
 
-
 export const calculateScore = (playedTiles, board) => {
     if (playedTiles.length === 0) return 0;
-
-    let totalScore = 0;
-    const scoredWords = new Set();
+  
     const newlyPlayedTiles = new Set(playedTiles.map(tile => `${tile.row},${tile.col}`));
-
-    // Determine the primary direction of the word based on the first two tiles
-    const isHorizontal = playedTiles.length > 1 ? playedTiles[0].row === playedTiles[1].row : true;
-
+  
     const calculateWordScore = (tiles) => {
         let wordScore = 0;
         let wordMultiplier = 1;
-        let hasNewTile = false; // Flag to check if the word has at least one new tile
-    
-        tiles.forEach(tile => {
+        let hasNewTile = false;
+  
+        for (const tile of tiles) {
             const { row, col, tile: letter } = tile;
             const letterValue = LETTER_VALUES[letter] || 0;
             let tileScore = letterValue;
-            const bonus = board[row][col]?.bonus;
-    
-            // Apply bonuses only if the tile is newly played
+  
             if (newlyPlayedTiles.has(`${row},${col}`)) {
                 hasNewTile = true;
+                const bonus = board[row][col]?.bonus;
                 if (bonus === 'dl') tileScore *= 2;
                 else if (bonus === 'tl') tileScore *= 3;
-                if (bonus === 'dw') wordMultiplier *= 2;
-                if (bonus === 'tw') wordMultiplier *= 3;
+                else if (bonus === 'dw') wordMultiplier *= 2;
+                else if (bonus === 'tw') wordMultiplier *= 3;
             }
-    
+  
             wordScore += tileScore;
-        });
-    
-        // Only return score if the word has at least one new tile
+        }
+  
         return hasNewTile ? wordScore * wordMultiplier : 0;
     };
-
-    const getWordTiles = (startRow, startCol, horizontal) => {
+  
+    const getWordTiles = (startRow, startCol, isHorizontal) => {
         let tiles = [];
         let row = startRow;
         let col = startCol;
-
-        // Move to the start of the word
+  
+        // Move to the beginning of the word
         while (row >= 0 && col >= 0 && board[row][col]?.tile) {
-            if (horizontal) col--;
-            else row--;
+            isHorizontal ? col-- : row--;
         }
-
-        // Adjust to get to the first tile
-        if (horizontal) col++;
-        else row++;
-
+        isHorizontal ? col++ : row++;
+  
         // Collect all tiles in the word
         while (row < 15 && col < 15 && board[row][col]?.tile) {
-            tiles.push({
-                row,
-                col,
-                tile: board[row][col].tile
-            });
-            if (horizontal) col++;
-            else row++;
+            tiles.push({ row, col, tile: board[row][col].tile });
+            isHorizontal ? col++ : row++;
         }
-
+  
         return tiles;
     };
-
-    // Score main word
+  
+    let totalScore = 0;
+  
+    // 1. Find the main word direction (horizontal or vertical)
+    const isHorizontal = playedTiles.length > 1 ? playedTiles[0].row === playedTiles[1].row : true;
+  
+    // 2. Score the main word
     const mainWordTiles = getWordTiles(playedTiles[0].row, playedTiles[0].col, isHorizontal);
-    if (mainWordTiles.some(tile => newlyPlayedTiles.has(`${tile.row},${tile.col}`))) {
-        totalScore += calculateWordScore(mainWordTiles);
-        scoredWords.add(JSON.stringify(mainWordTiles));
-    }
-
-    // Score perpendicular words
-    playedTiles.forEach(playedTile => {
-        const { row, col } = playedTile;
-        const perpendicularWord = getWordTiles(row, col, !isHorizontal);
-
-        if (perpendicularWord.length > 1 && perpendicularWord.some(tile => newlyPlayedTiles.has(`${tile.row},${tile.col}`))) {
-            const wordKey = JSON.stringify(perpendicularWord);
-            if (!scoredWords.has(wordKey)) {
-                totalScore += calculateWordScore(perpendicularWord);
-                scoredWords.add(wordKey);
-            }
+    totalScore += calculateWordScore(mainWordTiles);
+  
+    // 3. Score perpendicular words formed by the played tiles
+    for (const tile of playedTiles) {
+        const perpendicularWordTiles = getWordTiles(tile.row, tile.col, !isHorizontal);
+        // Only score if it's a valid word (length > 1) and contains a new tile
+        if (perpendicularWordTiles.length > 1 && perpendicularWordTiles.some(t => newlyPlayedTiles.has(`${t.row},${t.col}`))) {
+            totalScore += calculateWordScore(perpendicularWordTiles);
         }
-    });
-
+    }
+  
     return totalScore;
-};
+  };
