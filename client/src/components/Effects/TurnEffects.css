@@ -1,0 +1,36 @@
+@keyframes bounceUp {
+    0% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-100px);
+    }
+    100% {
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes dropAndFade {
+    0% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(100px);
+    }
+  }
+  
+  .animate-star1 {
+    animation: bounceUp 0.5s ease-in-out, dropAndFade 1s ease-in-out 0.5s forwards;
+  }
+  
+  .animate-star2 {
+    animation: bounceUp 0.5s ease-in-out 0.075s, dropAndFade 1s ease-in-out 0.575s forwards;
+    transform-origin: 30% 50%; /* Adjust for different drop angle */
+  }
+  
+  .animate-star3 {
+    animation: bounceUp 0.5s ease-in-out 0.15s, dropAndFade 1s ease-in-out 0.65s forwards;
+    transform-origin: 70% 50%; /* Adjust for different drop angle */
+  }

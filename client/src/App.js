@@ -12,6 +12,8 @@ import { isValidWord, calculateScore, drawTiles } from './utils';
 import './App.css';
 import { LETTER_VALUES } from './constants';
 import Logo from './images/logo-black.png';
+import StarEffects from './components/Effects/StarEffects';
+import YourTurnEffect from './components/Effects/YourTurnEffect';
 
 export const SERVER_URL = 'http://10.0.0.82:8080';
 
@@ -36,6 +38,8 @@ function App() {
     const [potentialScore, setPotentialScore] = useState(0);
     const [showBlankTileModal, setShowBlankTileModal] = useState(false);
     const [blankTilePosition, setBlankTilePosition] = useState(null);
+    const [turnEndScore, setTurnEndScore] = useState(0);
+    const [showStarEffects, setShowStarEffects] = useState(false);
 
     useEffect(() => {
         const newSocket = io(SERVER_URL);
@@ -75,6 +79,12 @@ function App() {
     }, []);
 
     const handleRackTileClick = (tile, index) => {
+        // Play tap-select sound
+        const tapSelectAudio = new Audio('/tap-select.mp3');
+        tapSelectAudio.play().catch(error => {
+            console.error("Error playing audio:", error);
+        });
+
         setSelectedTile({
             tile,
             from: {
@@ -88,42 +98,48 @@ function App() {
         if (!isCurrentPlayerTurn) return;
 
         if (existingTile) {
-          // Handle clicking a wildcard on the board
-          if (existingTile.originalTileValue && existingTile.originalTileValue === '_') {
-              const newBoard = [...board];
-              newBoard[row][col] = { ...newBoard[row][col], tile: null, original: false };
-              setBoard(newBoard);
+            // Handle clicking a wildcard on the board
+            if (existingTile.originalTileValue && existingTile.originalTileValue === '_') {
+                const newBoard = [...board];
+                newBoard[row][col] = { ...newBoard[row][col], tile: null, original: false };
+                setBoard(newBoard);
 
-              const updatedPlayers = [...players];
-              updatedPlayers[currentPlayer].rack.push('_'); // Return wildcard to rack
-              setPlayers(updatedPlayers);
-              setSelectedTile(null);
+                const updatedPlayers = [...players];
+                updatedPlayers[currentPlayer].rack.push('_'); // Return wildcard to rack
+                setPlayers(updatedPlayers);
+                setSelectedTile(null);
 
-              socket.emit('updateBoard', newBoard);
-              socket.emit('updateRack', {
-                  playerId: currentPlayer,
-                  rack: updatedPlayers[currentPlayer].rack
-              });
-              
-          } else if (!existingTile.original) {
-              // Handle clicking a non-original (played) tile
-              const newBoard = [...board];
-              const newTile = existingTile.originalTileValue ? { tile: existingTile.originalTileValue, original: false } : { tile: existingTile.tile, original: false };
-              newBoard[row][col] = { ...newBoard[row][col], tile: null, original: false };
-              setBoard(newBoard);
-              
-              const updatedPlayers = [...players];
-              updatedPlayers[currentPlayer].rack.push(newTile.tile);
-              setPlayers(updatedPlayers);
-              setSelectedTile(null);
-              
-              socket.emit('updateBoard', newBoard);
-              socket.emit('updateRack', {
-                  playerId: currentPlayer,
-                  rack: updatedPlayers[currentPlayer].rack
-              });
-          }
+                socket.emit('updateBoard', newBoard);
+                socket.emit('updateRack', {
+                    playerId: currentPlayer,
+                    rack: updatedPlayers[currentPlayer].rack
+                });
+
+            } else if (!existingTile.original) {
+                // Handle clicking a non-original (played) tile
+                const newBoard = [...board];
+                const newTile = existingTile.originalTileValue ? { tile: existingTile.originalTileValue, original: false } : { tile: existingTile.tile, original: false };
+                newBoard[row][col] = { ...newBoard[row][col], tile: null, original: false };
+                setBoard(newBoard);
+
+                const updatedPlayers = [...players];
+                updatedPlayers[currentPlayer].rack.push(newTile.tile);
+                setPlayers(updatedPlayers);
+                setSelectedTile(null);
+
+                socket.emit('updateBoard', newBoard);
+                socket.emit('updateRack', {
+                    playerId: currentPlayer,
+                    rack: updatedPlayers[currentPlayer].rack
+                });
+            }
         } else if (selectedTile) {
+            // Play tap-place sound
+            const tapPlaceAudio = new Audio('/tap-place.mp3');
+            tapPlaceAudio.play().catch(error => {
+                console.error("Error playing audio:", error);
+            });
+
             const newBoard = [...board];
             if (selectedTile.tile === '_') {
                 setShowBlankTileModal(true);
@@ -186,7 +202,7 @@ function App() {
                 const updatedPlayers = [...players];
                 updatedPlayers[currentPlayer] = { ...players[currentPlayer], rack: newRack };
                 setPlayers(updatedPlayers);
-                
+
                 setSelectedTile({ tile: tile, from: { type: 'rack', index: source.index } });
                 return;
             }
@@ -210,7 +226,7 @@ function App() {
             const [sourceRow, sourceCol] = source.droppableId.split('-').slice(1).map(Number);
             const tile = board[sourceRow][sourceCol].tile;
             const originalTileValue = board[sourceRow][sourceCol].originalTileValue;
-            
+
             if (originalTileValue === '_') {
                 const newBoard = [...board];
                 newBoard[sourceRow][sourceCol] = { tile: null, bonus: newBoard[sourceRow][sourceCol].bonus, original: false };
@@ -229,7 +245,7 @@ function App() {
                 const newBoard = [...board];
                 newBoard[sourceRow][sourceCol] = { tile: null, bonus: newBoard[sourceRow][sourceCol].bonus, original: false };
                 setBoard(newBoard);
-                
+
                 const newRack = [...players[currentPlayer].rack];
                 const newTile = originalTileValue ? originalTileValue : tile;
                 newRack.splice(destination.index, 0, newTile);
@@ -237,7 +253,7 @@ function App() {
                 const updatedPlayers = [...players];
                 updatedPlayers[currentPlayer] = { ...players[currentPlayer], rack: newRack };
                 setPlayers(updatedPlayers);
-                
+
                 socket.emit('updateBoard', newBoard);
                 socket.emit('updateRack', { playerId: currentPlayer, rack: newRack });
             }
@@ -452,30 +468,47 @@ function App() {
             ...cell,
             original: cell.original || (cell.tile !== null)
         })));
-        setBoard(newBoard);
 
-        const nextPlayer = (currentPlayer + 1) % 2;
-        setCurrentPlayer(nextPlayer);
-        setSelectedTile(null);
-        setPotentialScore(0);
+        // Set the turn end score
+        setTurnEndScore(totalScore);
 
-        let updatedPlayers = [...players];
-        const tilesToDraw = Math.max(0, 7 - updatedPlayers[currentPlayer].rack.length);
-        const newTiles = drawTiles(bag, tilesToDraw);
-        updatedPlayers[currentPlayer].rack = [...updatedPlayers[currentPlayer].rack, ...newTiles];
+        // Show star effects
+        setShowStarEffects(true);
 
-        setBag(bag.filter(tile => !newTiles.includes(tile)));
-
-        socket.emit('playWord', {
-            board: newBoard,
-            players: updatedPlayers.map((player, index) =>
-                index === currentPlayer
-                    ? { ...player, score: player.score + totalScore }
-                    : player
-            ),
-            currentPlayer: nextPlayer,
-            bag: bag.filter(tile => !newTiles.includes(tile))
+        // Play sound immediately
+        const endTurnAudio = new Audio('/stars_stereo.mp3');
+        endTurnAudio.play().catch(error => {
+            console.error("Error playing audio:", error);
         });
+
+        // Delay for animation and then switch to the next player
+        setTimeout(() => {
+            const nextPlayer = (currentPlayer + 1) % 2;
+            setCurrentPlayer(nextPlayer);
+            setSelectedTile(null);
+            setPotentialScore(0);
+            setShowStarEffects(false);
+
+            let updatedPlayers = [...players];
+            const tilesToDraw = Math.max(0, 7 - updatedPlayers[currentPlayer].rack.length);
+            const newTiles = drawTiles(bag, tilesToDraw);
+            updatedPlayers[currentPlayer].rack = [...updatedPlayers[currentPlayer].rack, ...newTiles];
+
+            setBag(bag.filter(tile => !newTiles.includes(tile)));
+            setBoard(newBoard);
+
+            // Update the game state on the server
+            socket.emit('playWord', {
+                board: newBoard,
+                players: updatedPlayers.map((player, index) =>
+                    index === currentPlayer
+                        ? { ...player, score: player.score + totalScore }
+                        : player
+                ),
+                currentPlayer: nextPlayer,
+                bag: bag.filter(tile => !newTiles.includes(tile))
+            });
+        }, 1500);
     };
 
     const handleExchange = () => {
@@ -577,15 +610,15 @@ function App() {
     const handleSelectBlankTile = (letter) => {
         if (blankTilePosition) {
             if (blankTilePosition.from === 'drag') {
-              // Update the tile on the board
-              const { row, col } = blankTilePosition;
-              const newBoard = [...board];
-              newBoard[row][col] = { ...newBoard[row][col], tile: letter, originalTileValue: '_', original: false };
-              setBoard(newBoard);
-              updatePotentialScore();
+                // Update the tile on the board
+                const { row, col } = blankTilePosition;
+                const newBoard = [...board];
+                newBoard[row][col] = { ...newBoard[row][col], tile: letter, originalTileValue: '_', original: false };
+                setBoard(newBoard);
+                updatePotentialScore();
 
-              // Emit updateBoard event to the server
-              socket.emit('updateBoard', newBoard);
+                // Emit updateBoard event to the server
+                socket.emit('updateBoard', newBoard);
             } else if (blankTilePosition.from === 'board') {
                 // Update the tile on the board
                 const { row, col } = blankTilePosition;
@@ -621,9 +654,15 @@ function App() {
                     <div className={isCurrentPlayerTurn ? "font-bold text-sm my-2" : "text-sm my-2"}>
                         {isCurrentPlayerTurn ? "Your Turn" : "Waiting for Opponent"}
                     </div>
+                    {/* Play "your turn" sound at the beginning of the turn */}
+                    <YourTurnEffect isCurrentPlayerTurn={isCurrentPlayerTurn} />
+
+                    {/* Show star effects at the end of the turn */}
+                    {showStarEffects && <StarEffects />}
                     <Scoreboard players={players} currentPlayer={currentPlayer} />
+
                     <div className="potential-score text-xs">
-                        Score Bonus: 
+                        Score Bonus:
                         {potentialScore !== 0 ? "+" : ''}
                         {potentialScore !== 0 ? potentialScore : '-'}
                     </div>

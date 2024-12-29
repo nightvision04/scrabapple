@@ -10,7 +10,7 @@ function Rack({ rack, onTileClick, selectedTile }) {
         <div ref={provided.innerRef} {...provided.droppableProps} role="list" className="rack">
           {rack.map((tile, index) => {
             const draggableId = `tile-${index}`;
-            console.log("Rendering Tile with draggableId:", draggableId); // Verify draggableId
+        
             return (
               <Tile
                 key={index}
