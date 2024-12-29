@@ -8,12 +8,14 @@ import Rack from './components/Rack/Rack';
 import Scoreboard from './components/Scoreboard/Scoreboard';
 import GameControls from './components/GameControls/GameControls';
 import Tile from './components/Tile/Tile';
-import { isValidWord, calculateScore, drawTiles } from './utils';
+import { isValidWord, calculateScore, drawTiles, createEmptyBoard, createTileBag } from './utils'; // Import createEmptyBoard and createTileBag
 import './App.css';
 import { LETTER_VALUES } from './constants';
 import Logo from './images/logo-black.png';
 import StarEffects from './components/Effects/StarEffects';
 import YourTurnEffect from './components/Effects/YourTurnEffect';
+import EndScreen from './components/EndScreen/EndScreen';
+import Waiting from './components/Waiting/Waiting';
 
 export const SERVER_URL = 'http://10.0.0.82:8080';
 
@@ -41,23 +43,23 @@ function App() {
     const [turnEndScore, setTurnEndScore] = useState(0);
     const [showStarEffects, setShowStarEffects] = useState(false);
     const [playEndTurnAudio, setPlayEndTurnAudio] = useState(false);
+    const [gameOver, setGameOver] = useState(false);
 
     // Create audio objects once and reuse them
     const tapSelectAudio = useRef(new Audio('/tap-select.mp3')).current;
     const tapPlaceAudio = useRef(new Audio('/tap-place.mp3')).current;
-    const endTurnAudio = useRef(new Audio('/stars.mp3')).current;
+    const endTurnAudio = useRef(new Audio('/stars_stereo.mp3')).current;
+    const endGameAudio = useRef(new Audio('/end-game.mp3')).current;
 
     useEffect(() => {
         const newSocket = io(SERVER_URL);
         setSocket(newSocket);
 
         newSocket.on('connect', () => {
-            console.log('Connected to server');
             newSocket.emit('joinGame');
         });
 
         newSocket.on('gameUpdate', (gameState) => {
-            console.log("gameUpdate received:", gameState);
             setBoard(gameState.board);
             setPlayers(gameState.players);
             setCurrentPlayer(gameState.currentPlayer);
@@ -93,6 +95,22 @@ function App() {
             setPlayEndTurnAudio(false); // Reset the trigger
         }
     }, [playEndTurnAudio]);
+
+    useEffect(() => {
+        // Check for game over when the bag is empty and a player has no tiles
+        if (gameStarted && bag.length === 0 && (players[0].rack.length === 0 || players[1].rack.length === 0)) {
+            setGameOver(true);
+        }
+    }, [gameStarted, bag, players]);
+
+    useEffect(() => {
+        if (gameOver) {
+          endGameAudio.currentTime = 0;
+          endGameAudio.play().catch(error => {
+            console.error("Error playing end game audio:", error);
+          });
+        }
+      }, [gameOver]);
 
     const handleRackTileClick = (tile, index) => {
         // Play tap-select sound using the pre-created audio object
@@ -529,16 +547,39 @@ function App() {
             const tileIndex = newRack.indexOf(tileToExchange);
 
             if (tileIndex > -1) {
+                // Remove the selected tile from the rack
                 newRack.splice(tileIndex, 1);
+
+                // Clear any unplayed tiles from the board and add them back to the player's rack
+                const newBoard = [...board];
+                for (let i = 0; i < 15; i++) {
+                    for (let j = 0; j < 15; j++) {
+                        if (newBoard[i][j].tile && !newBoard[i][j].original) {
+                            newRack.push(newBoard[i][j].tile);
+                            newBoard[i][j] = { ...newBoard[i][j], tile: null };
+                        }
+                    }
+                }
 
                 const updatedPlayers = [...players];
                 updatedPlayers[currentPlayer] = { ...players[currentPlayer], rack: newRack };
+
+                // Update the state for the current player
+                setBoard(newBoard);
                 setPlayers(updatedPlayers);
                 setSelectedTile(null);
+                setPotentialScore(0);
 
+                // Switch to the next player
                 const nextPlayer = (currentPlayer + 1) % 2;
                 setCurrentPlayer(nextPlayer);
 
+                // Emit the updated board, rack, and exchange to the server
+                socket.emit('updateBoard', newBoard);
+                socket.emit('updateRack', {
+                    playerId: currentPlayer,
+                    rack: newRack
+                });
                 socket.emit('exchangeTile', {
                     playerId: currentPlayer,
                     rack: newRack,
@@ -550,29 +591,22 @@ function App() {
             alert("Please select a tile from your rack to exchange.");
         }
     };
+    
 
     const handlePass = () => {
-        console.log("handlePass called");
 
         // 1. Remove unplayed tiles from the board and return them to the player's rack
         const newBoard = [...board];
         const newRack = [...players[currentPlayer].rack];
 
-        console.log("Current board state:", newBoard);
-        console.log("Current rack state:", newRack);
-
         for (let i = 0; i < 15; i++) {
             for (let j = 0; j < 15; j++) {
                 if (newBoard[i][j].tile && !newBoard[i][j].original) {
-                    console.log(`Found unplayed tile at [${i}, ${j}]:`, newBoard[i][j].tile);
                     newRack.push(newBoard[i][j].tile);
                     newBoard[i][j] = { ...newBoard[i][j], tile: null }; // Remove tile visually
                 }
             }
         }
-
-        console.log("New board state after removing tiles:", newBoard);
-        console.log("New rack state after adding tiles:", newRack);
 
         // 2. Update the state for the current player
         const updatedPlayers = [...players];
@@ -585,7 +619,6 @@ function App() {
 
         // 3. Switch to the next player
         const nextPlayer = (currentPlayer + 1) % 2;
-        console.log("Switching to next player:", nextPlayer);
         setCurrentPlayer(nextPlayer);
 
         // 4. Emit the updated board and rack to the server AFTER the turn is switched
@@ -598,7 +631,6 @@ function App() {
             currentPlayer: nextPlayer
         });
 
-        console.log("handlePass completed");
     };
 
     const handleShuffle = () => {
@@ -655,12 +687,55 @@ function App() {
 
     const backend = isTouchDevice() ? TouchBackend : HTML5Backend;
 
+    const handleNewGame = () => {
+        // Reset the game state
+        setBoard(createEmptyBoard());
+        setPlayers([
+            { score: 0, rack: [], socketId: null },
+            { score: 0, rack: [], socketId: null }
+        ]);
+        setCurrentPlayer(0);
+        setBag(createTileBag());
+        setSelectedTile(null);
+        setGameStarted(false); // Set gameStarted to false initially
+        setError('');
+        setPotentialScore(0);
+        setShowBlankTileModal(false);
+        setBlankTilePosition(null);
+        setTurnEndScore(0);
+        setShowStarEffects(false);
+        setPlayEndTurnAudio(false);
+        setGameOver(false);
+    
+        // Reconnect to the server
+        const newSocket = io(SERVER_URL);
+        setSocket(newSocket);
+    
+        newSocket.on('connect', () => {
+            newSocket.emit('joinGame');
+        });
+    
+        // Set up other event listeners as before
+        newSocket.on('gameUpdate', (gameState) => {
+            setBoard(gameState.board);
+            setPlayers(gameState.players);
+            setCurrentPlayer(gameState.currentPlayer);
+            setBag(gameState.bag);
+            setGameStarted(gameState.gameStarted);
+        });
+    
+        // ... other event listeners
+    
+        return () => newSocket.close();
+    };
+
     return (
         <div className="app m-0 bg-amber-50">
             <img src={Logo} alt="Scrabble Logo" className="logo pt-2 pb-0 w-[30vw]" />
+            {gameOver && gameStarted && <EndScreen players={players} onNewGame={handleNewGame} />}
             {/* {error && <div className="error">{error}</div>} */}
-            {!gameStarted && <div className='text-xs my-2'>Waiting for another player...</div>}
-            {gameStarted && (
+            {!gameStarted && <Waiting />}
+            {!gameOver && gameStarted && (
                 <>
                     <div className={isCurrentPlayerTurn ? "font-bold text-sm my-2" : "text-sm my-2"}>
                         {isCurrentPlayerTurn ? "Your Turn" : "Waiting for Opponent"}
@@ -672,10 +747,9 @@ function App() {
                     <StarEffects isComplete={showStarEffects} setIsComplete={setShowStarEffects}/>
                     <Scoreboard players={players} currentPlayer={currentPlayer} />
 
-                    <div className="potential-score text-xs">
-                        Score Bonus:
-                        {potentialScore !== 0 ? "+" : ''}
-                        {potentialScore !== 0 ? potentialScore : '-'}
+                    <div className="flex items-center justify-center text-xs gap-4">
+                        <span>Score Bonus: {potentialScore !== 0 ? "+" : ''}{potentialScore !== 0 ? potentialScore : '-'}</span>
+                        <span>Tiles Left: {bag.length}</span>
                     </div>
                     <DragDropContext onDragEnd={onDragEnd} backend={backend} options={backendOptions}>
                         <Droppable droppableId="board">
