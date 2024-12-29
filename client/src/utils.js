@@ -1,4 +1,5 @@
 import { BOARD_BONUSES, LETTER_VALUES } from './constants';
+import { SERVER_URL } from './App';
 
 export const createEmptyBoard = () => {
     const board = [];
@@ -46,7 +47,7 @@ export const isValidWord = async (word, board) => {
     }
 
     try {
-        const response = await fetch(`http://localhost:8080/validate-word/${word.toLowerCase()}`);
+        const response = await fetch(`${SERVER_URL}/validate-word/${word.toLowerCase()}`);
         const data = await response.json();
         return data.isValid;
     } catch (error) {

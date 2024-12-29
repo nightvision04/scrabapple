@@ -8,7 +8,7 @@ const Tile = forwardRef(({ value, isSelected, onTileClick, draggableId, index },
             className={`
                 w-full h-full p-0.5
                 bg-gradient-to-br from-[#f4e4bc] to-[#ecd29b]
-                border-2 border-[#8B4513]
+                border-0 border-[#8B4513]
                 flex items-center justify-center
                 rounded-sm cursor-pointer
                 shadow-[2px_2px_3px_rgba(0,0,0,0.3),inset_1px_1px_2px_rgba(255,255,255,0.5)]

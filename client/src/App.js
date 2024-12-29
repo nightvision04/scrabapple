@@ -11,8 +11,9 @@ import Tile from './components/Tile/Tile';
 import { isValidWord, calculateScore, drawTiles } from './utils';
 import './App.css';
 import { LETTER_VALUES } from './constants';
+import Logo from './images/logo-black.png';
 
-const SERVER_URL = 'http://10.0.0.82:8080';
+export const SERVER_URL = 'http://10.0.0.82:8080';
 
 function isTouchDevice() {
     return (('ontouchstart' in window) ||
@@ -87,40 +88,65 @@ function App() {
         if (!isCurrentPlayerTurn) return;
 
         if (existingTile) {
-            const newBoard = [...board];
-            const newTile = existingTile.originalTileValue ? { tile: existingTile.originalTileValue, original: false } : { tile: '_', original: false };
-            newBoard[row][col] = { ...newBoard[row][col], tile: null, original: false };
-            setBoard(newBoard);
+          // Handle clicking a wildcard on the board
+          if (existingTile.originalTileValue && existingTile.originalTileValue === '_') {
+              const newBoard = [...board];
+              newBoard[row][col] = { ...newBoard[row][col], tile: null, original: false };
+              setBoard(newBoard);
 
-            const updatedPlayers = [...players];
-            updatedPlayers[currentPlayer].rack.push(newTile.tile);
-            setPlayers(updatedPlayers);
-            setSelectedTile(null);
+              const updatedPlayers = [...players];
+              updatedPlayers[currentPlayer].rack.push('_'); // Return wildcard to rack
+              setPlayers(updatedPlayers);
+              setSelectedTile(null);
 
-            socket.emit('updateBoard', newBoard);
-            socket.emit('updateRack', {
-                playerId: currentPlayer,
-                rack: updatedPlayers[currentPlayer].rack
-            });
+              socket.emit('updateBoard', newBoard);
+              socket.emit('updateRack', {
+                  playerId: currentPlayer,
+                  rack: updatedPlayers[currentPlayer].rack
+              });
+              
+          } else if (!existingTile.original) {
+              // Handle clicking a non-original (played) tile
+              const newBoard = [...board];
+              const newTile = existingTile.originalTileValue ? { tile: existingTile.originalTileValue, original: false } : { tile: existingTile.tile, original: false };
+              newBoard[row][col] = { ...newBoard[row][col], tile: null, original: false };
+              setBoard(newBoard);
+              
+              const updatedPlayers = [...players];
+              updatedPlayers[currentPlayer].rack.push(newTile.tile);
+              setPlayers(updatedPlayers);
+              setSelectedTile(null);
+              
+              socket.emit('updateBoard', newBoard);
+              socket.emit('updateRack', {
+                  playerId: currentPlayer,
+                  rack: updatedPlayers[currentPlayer].rack
+              });
+          }
         } else if (selectedTile) {
             const newBoard = [...board];
-            newBoard[row][col] = { ...newBoard[row][col], tile: selectedTile.tile, original: false };
-            setBoard(newBoard);
+            if (selectedTile.tile === '_') {
+                setShowBlankTileModal(true);
+                setBlankTilePosition({ row, col, from: 'board' });
+            } else {
+                newBoard[row][col] = { ...newBoard[row][col], tile: selectedTile.tile, original: false };
+                setBoard(newBoard);
 
-            const updatedPlayers = [...players];
-            const rackIndex = selectedTile.from.index;
-            if (selectedTile.from.type === 'rack') {
-                updatedPlayers[currentPlayer].rack.splice(rackIndex, 1);
-                setPlayers(updatedPlayers);
+                const updatedPlayers = [...players];
+                const rackIndex = selectedTile.from.index;
+                if (selectedTile.from.type === 'rack') {
+                    updatedPlayers[currentPlayer].rack.splice(rackIndex, 1);
+                    setPlayers(updatedPlayers);
 
-                socket.emit('updateRack', {
-                    playerId: currentPlayer,
-                    rack: updatedPlayers[currentPlayer].rack
-                });
+                    socket.emit('updateRack', {
+                        playerId: currentPlayer,
+                        rack: updatedPlayers[currentPlayer].rack
+                    });
+                }
+
+                setSelectedTile(null);
+                socket.emit('updateBoard', newBoard);
             }
-
-            setSelectedTile(null);
-            socket.emit('updateBoard', newBoard);
         }
 
         updatePotentialScore();
@@ -153,15 +179,15 @@ function App() {
 
             if (tile === '_') {
                 setShowBlankTileModal(true);
-                setBlankTilePosition({ row, col });
+                setBlankTilePosition({ row, col, from: 'drag' });
 
                 const newRack = [...players[currentPlayer].rack];
-                const [movedTile] = newRack.splice(source.index, 1);
-
+                newRack.splice(source.index, 1);
                 const updatedPlayers = [...players];
                 updatedPlayers[currentPlayer] = { ...players[currentPlayer], rack: newRack };
                 setPlayers(updatedPlayers);
-                setSelectedTile({ tile: movedTile, from: { type: 'rack', index: source.index } });
+                
+                setSelectedTile({ tile: tile, from: { type: 'rack', index: source.index } });
                 return;
             }
 
@@ -184,21 +210,37 @@ function App() {
             const [sourceRow, sourceCol] = source.droppableId.split('-').slice(1).map(Number);
             const tile = board[sourceRow][sourceCol].tile;
             const originalTileValue = board[sourceRow][sourceCol].originalTileValue;
+            
+            if (originalTileValue === '_') {
+                const newBoard = [...board];
+                newBoard[sourceRow][sourceCol] = { tile: null, bonus: newBoard[sourceRow][sourceCol].bonus, original: false };
+                setBoard(newBoard);
 
-            const newBoard = [...board];
-            newBoard[sourceRow][sourceCol] = { tile: null, bonus: newBoard[sourceRow][sourceCol].bonus, original: false };
-            setBoard(newBoard);
+                const newRack = [...players[currentPlayer].rack];
+                newRack.splice(destination.index, 0, '_');
 
-            const newRack = [...players[currentPlayer].rack];
-            const newTile = originalTileValue ? originalTileValue : tile;
-            newRack.splice(destination.index, 0, newTile);
+                const updatedPlayers = [...players];
+                updatedPlayers[currentPlayer] = { ...players[currentPlayer], rack: newRack };
+                setPlayers(updatedPlayers);
 
-            const updatedPlayers = [...players];
-            updatedPlayers[currentPlayer] = { ...players[currentPlayer], rack: newRack };
-            setPlayers(updatedPlayers);
+                socket.emit('updateBoard', newBoard);
+                socket.emit('updateRack', { playerId: currentPlayer, rack: newRack });
+            } else {
+                const newBoard = [...board];
+                newBoard[sourceRow][sourceCol] = { tile: null, bonus: newBoard[sourceRow][sourceCol].bonus, original: false };
+                setBoard(newBoard);
+                
+                const newRack = [...players[currentPlayer].rack];
+                const newTile = originalTileValue ? originalTileValue : tile;
+                newRack.splice(destination.index, 0, newTile);
 
-            socket.emit('updateBoard', newBoard);
-            socket.emit('updateRack', { playerId: currentPlayer, rack: newRack });
+                const updatedPlayers = [...players];
+                updatedPlayers[currentPlayer] = { ...players[currentPlayer], rack: newRack };
+                setPlayers(updatedPlayers);
+                
+                socket.emit('updateBoard', newBoard);
+                socket.emit('updateRack', { playerId: currentPlayer, rack: newRack });
+            }
         }
         updatePotentialScore();
     };
@@ -212,24 +254,24 @@ function App() {
                 }
             }
         }
-    
+
         if (playedTiles.length === 0) {
             return 0;
         }
-    
+
         let totalScore = 0;
         const newlyPlayedTiles = new Set(playedTiles.map(tile => `${tile.row},${tile.col}`));
-    
+
         const calculateWordScore = (tiles) => {
             let wordScore = 0;
             let wordMultiplier = 1;
             let hasNewTile = false;
-    
+
             for (const tile of tiles) {
                 const { row, col, tile: letter } = tile;
                 const letterValue = LETTER_VALUES[letter] || 0;
                 let tileScore = letterValue;
-    
+
                 if (newlyPlayedTiles.has(`${row},${col}`)) {
                     hasNewTile = true;
                     const bonus = board[row][col]?.bonus;
@@ -243,42 +285,42 @@ function App() {
                         wordMultiplier *= 3;
                     }
                 }
-    
+
                 wordScore += tileScore;
             }
-    
+
             return hasNewTile ? wordScore * wordMultiplier : 0;
         };
-    
+
         const getWordTiles = (startRow, startCol, isHorizontal) => {
             let tiles = [];
             let row = startRow;
             let col = startCol;
-    
+
             // Move to the beginning of the word
             while (row >= 0 && col >= 0 && board[row][col]?.tile) {
                 isHorizontal ? col-- : row--;
             }
             isHorizontal ? col++ : row++;
-    
+
             // Collect all tiles in the word
             while (row < 15 && col < 15 && board[row][col]?.tile) {
                 tiles.push({ row, col, tile: board[row][col].tile });
                 isHorizontal ? col++ : row++;
             }
-    
+
             return tiles;
         };
-    
+
         // If only one tile is played, consider it horizontal by default
         const isHorizontal = playedTiles.length > 1 ? playedTiles[0].row === playedTiles[1].row : true;
-    
+
         // Score the main word
         if (playedTiles.length > 0) {
             const mainWordTiles = getWordTiles(playedTiles[0].row, playedTiles[0].col, isHorizontal);
             totalScore += calculateWordScore(mainWordTiles);
         }
-    
+
         // Score perpendicular words formed by the played tiles
         for (const tile of playedTiles) {
             const perpendicularWordTiles = getWordTiles(tile.row, tile.col, !isHorizontal);
@@ -287,7 +329,7 @@ function App() {
                 totalScore += calculateWordScore(perpendicularWordTiles);
             }
         }
-    
+
         return totalScore;
     };
 
@@ -467,14 +509,14 @@ function App() {
 
     const handlePass = () => {
         console.log("handlePass called");
-    
+
         // 1. Remove unplayed tiles from the board and return them to the player's rack
         const newBoard = [...board];
         const newRack = [...players[currentPlayer].rack];
-    
+
         console.log("Current board state:", newBoard);
         console.log("Current rack state:", newRack);
-    
+
         for (let i = 0; i < 15; i++) {
             for (let j = 0; j < 15; j++) {
                 if (newBoard[i][j].tile && !newBoard[i][j].original) {
@@ -484,24 +526,24 @@ function App() {
                 }
             }
         }
-    
+
         console.log("New board state after removing tiles:", newBoard);
         console.log("New rack state after adding tiles:", newRack);
-    
+
         // 2. Update the state for the current player
         const updatedPlayers = [...players];
         updatedPlayers[currentPlayer] = { ...players[currentPlayer], rack: newRack };
-    
+
         setBoard(newBoard); // Update the board state to visually remove tiles
         setPlayers(updatedPlayers);
         setSelectedTile(null);
         setPotentialScore(0);
-    
+
         // 3. Switch to the next player
         const nextPlayer = (currentPlayer + 1) % 2;
         console.log("Switching to next player:", nextPlayer);
         setCurrentPlayer(nextPlayer);
-    
+
         // 4. Emit the updated board and rack to the server AFTER the turn is switched
         socket.emit('updateBoard', newBoard);
         socket.emit('updateRack', {
@@ -511,7 +553,7 @@ function App() {
         socket.emit('passTurn', {
             currentPlayer: nextPlayer
         });
-    
+
         console.log("handlePass completed");
     };
 
@@ -534,18 +576,21 @@ function App() {
 
     const handleSelectBlankTile = (letter) => {
         if (blankTilePosition) {
-            if (blankTilePosition.from === 'rack') {
-                // Update the tile in the rack
-                const updatedPlayers = [...players];
-                const rackIndex = selectedTile.from.index;
-                updatedPlayers[currentPlayer].rack[rackIndex] = letter;
-                setPlayers(updatedPlayers);
-                setSelectedTile({ tile: letter, from: { type: 'rack', index: rackIndex } });
-            } else {
+            if (blankTilePosition.from === 'drag') {
+              // Update the tile on the board
+              const { row, col } = blankTilePosition;
+              const newBoard = [...board];
+              newBoard[row][col] = { ...newBoard[row][col], tile: letter, originalTileValue: '_', original: false };
+              setBoard(newBoard);
+              updatePotentialScore();
+
+              // Emit updateBoard event to the server
+              socket.emit('updateBoard', newBoard);
+            } else if (blankTilePosition.from === 'board') {
                 // Update the tile on the board
                 const { row, col } = blankTilePosition;
                 const newBoard = [...board];
-                newBoard[row][col] = { ...newBoard[row][col], tile: letter, original: false };
+                newBoard[row][col] = { ...newBoard[row][col], tile: letter, originalTileValue: '_', original: false };
                 setBoard(newBoard);
                 updatePotentialScore();
 
@@ -567,18 +612,20 @@ function App() {
     const backend = isTouchDevice() ? TouchBackend : HTML5Backend;
 
     return (
-        <div className="app">
-            <h1>Scrabble Game</h1>
-            {error && <div className="error">{error}</div>}
-            {!gameStarted && <div>Waiting for another player...</div>}
+        <div className="app m-0 bg-amber-50">
+            <img src={Logo} alt="Scrabble Logo" className="logo pt-2 pb-0 w-[30vw]" />
+            {/* {error && <div className="error">{error}</div>} */}
+            {!gameStarted && <div className='text-xs my-2'>Waiting for another player...</div>}
             {gameStarted && (
                 <>
-                    <div className="turn-indicator">
+                    <div className={isCurrentPlayerTurn ? "font-bold text-sm my-2" : "text-sm my-2"}>
                         {isCurrentPlayerTurn ? "Your Turn" : "Waiting for Opponent"}
                     </div>
                     <Scoreboard players={players} currentPlayer={currentPlayer} />
-                    <div className="potential-score">
-                        Potential Score: {potentialScore}
+                    <div className="potential-score text-xs">
+                        Score Bonus: 
+                        {potentialScore !== 0 ? "+" : ''}
+                        {potentialScore !== 0 ? potentialScore : '-'}
                     </div>
                     <DragDropContext onDragEnd={onDragEnd} backend={backend} options={backendOptions}>
                         <Droppable droppableId="board">
@@ -627,15 +674,16 @@ function App() {
                         />
                     </DragDropContext>
                     {showBlankTileModal && (
-                        <div className="modal-container">
-                            <div className="modal-content">
-                                <h2>Select a Letter for the Blank Tile</h2>
-                                <div className="alphabet-grid">
+                        <div className="modal-container fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+                            <div className="modal-content bg-white p-4 rounded shadow-lg">
+                                <h2 className="text-lg font-bold mb-2">Select a Letter for the Blank Tile</h2>
+                                <div className="alphabet-grid grid grid-cols-6 gap-2">
                                     {Array.from({ length: 26 }, (_, i) => {
                                         const letter = String.fromCharCode(65 + i);
                                         return (
                                             <button
                                                 key={letter}
+                                                className="p-2 bg-gray-200 rounded hover:bg-gray-300"
                                                 onClick={() => handleSelectBlankTile(letter)}
                                             >
                                                 {letter}

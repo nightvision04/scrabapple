@@ -1,12 +1,15 @@
 import React from 'react';
+import { FaExchangeAlt } from 'react-icons/fa';
+import { FaAngleDoubleRight } from 'react-icons/fa';
+import { FaSyncAlt } from 'react-icons/fa';
 
 const GameControls = ({ onPlay, onExchange, onPass, onShuffle, disabled }) => {
   return (
-    <div className="flex flex-wrap gap-2 justify-center mt-4 p-4">
+    <div className="flex flex-wrap gap-2 justify-center -mt-2 p-4">
       <button
         onClick={onPlay}
-        className={`px-4 py-2 bg-green-600 text-white rounded-lg transition-colors ${
-          disabled ? 'bg-green-400 cursor-not-allowed' : 'hover:bg-green-700'
+        className={`px-4 py-2 bg-blue-600 text-white rounded-lg transition-colors ${
+          disabled ? 'bg-blue-400 cursor-not-allowed' : 'hover:bg-blue-700'
         }`}
         disabled={disabled}
       >
@@ -14,30 +17,30 @@ const GameControls = ({ onPlay, onExchange, onPass, onShuffle, disabled }) => {
       </button>
       <button
         onClick={onExchange}
-        className={`px-4 py-2 bg-blue-600 text-white rounded-lg transition-colors ${
-          disabled ? 'bg-blue-400 cursor-not-allowed' : 'hover:bg-blue-700'
+        className={`px-4 py-2 bg-amber-900 text-white rounded-lg transition-colors ${
+          disabled ? 'bg-amber-400 cursor-not-allowed' : 'hover:bg-amber-700'
         }`}
         disabled={disabled}
       >
-        Exchange
+        <FaExchangeAlt className="inline-block" />
       </button>
       <button
         onClick={onPass}
-        className={`px-4 py-2 bg-yellow-600 text-white rounded-lg transition-colors ${
-          disabled ? 'bg-yellow-400 cursor-not-allowed' : 'hover:bg-yellow-700'
+        className={`px-4 py-2 bg-amber-900 text-white rounded-lg transition-colors ${
+          disabled ? 'bg-amber-400 cursor-not-allowed' : 'hover:bg-amber-700'
         }`}
         disabled={disabled}
       >
-        Pass
+        <FaAngleDoubleRight className="inline-block" />
       </button>
       <button
         onClick={onShuffle}
-        className={`px-4 py-2 bg-purple-600 text-white rounded-lg transition-colors ${
-          disabled ? 'bg-purple-400 cursor-not-allowed' : 'hover:bg-purple-700'
+        className={`px-4 py-2 bg-amber-900 text-white rounded-lg transition-colors ${
+          disabled ? 'bg-amber-400 cursor-not-allowed' : 'hover:bg-amber-700'
         }`}
         disabled={disabled}
       >
-        Shuffle Rack
+        <FaSyncAlt className="inline-block" />
       </button>
     </div>
   );

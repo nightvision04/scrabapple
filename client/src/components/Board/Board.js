@@ -15,7 +15,7 @@ const Board = ({ board, onTileClick, isCurrentPlayerTurn, currentPlayer }) => {
     };
 
     return (
-        <div className="w-full max-w-4xl mx-auto p-4">
+        <div className="w-full max-w-4xl mx-auto p-0 -mb-3 mt-2">
             <div className="aspect-square w-full">
                 <div role="grid" className="grid grid-cols-15 gap-1 h-full w-full bg-amber-900 p-2 rounded-lg shadow-lg">
                     {board.map((row, rowIndex) => (
@@ -30,7 +30,7 @@ const Board = ({ board, onTileClick, isCurrentPlayerTurn, currentPlayer }) => {
                                         onClick={() => handleTileClick(rowIndex, colIndex)}
                                         className={`
                                             aspect-square flex items-center justify-center
-                                            p-0.5 rounded cursor-pointer
+                                            p-[0px] rounded cursor-pointer
                                             ${getBonusClassName(cell.bonus)}
                                         `}
                                         data-testid={`cell-${rowIndex}-${colIndex}`}
@@ -48,11 +48,11 @@ const Board = ({ board, onTileClick, isCurrentPlayerTurn, currentPlayer }) => {
                                         {!cell.tile && (
                                             <>
                                                 {rowIndex === 7 && colIndex === 7 && (
-                                                    <span className="bg-pink-300 text-pink-900 hover:bg-pink-200 text-[8px]">★</span>
+                                                    <span className="bg-pink-300 text-pink-900 hover:bg-pink-200 text-[12px]">★</span>
                                                 )}
                                                 {cell.bonus && !cell.tile && (
-                                                    <div className="text-[8px] leading-none text-center font-medium">
-                                                        {getBonusText(cell.bonus)}
+                                                    <div className="text-[12px] leading-none text-center font-medium">
+                                                        {!(rowIndex === 7 && colIndex === 7) && getBonusText(cell.bonus)}
                                                     </div>
                                                 )}
                                             </>
