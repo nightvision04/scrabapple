@@ -6,6 +6,10 @@
     "cra-template": "1.2.0",
     "react": "^18.2.0",
     "react-beautiful-dnd": "^13.1.1",
+    "react-device-detect": "^2.2.3",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
+    "react-dnd-touch-backend": "^16.0.1",
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1",
     "socket.io-client": "^4.8.1"
@@ -36,6 +40,7 @@
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
     "autoprefixer": "^10.4.20",
     "jest": "^27.5.1",
     "postcss": "^8.4.49",

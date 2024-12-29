@@ -17,7 +17,7 @@ const Board = ({ board, onTileClick, isCurrentPlayerTurn, currentPlayer }) => {
     return (
         <div className="w-full max-w-4xl mx-auto p-4">
             <div className="aspect-square w-full">
-                <div className="grid grid-cols-15 gap-1 h-full w-full bg-amber-900 p-2 rounded-lg shadow-lg">
+                <div role="grid" className="grid grid-cols-15 gap-1 h-full w-full bg-amber-900 p-2 rounded-lg shadow-lg">
                     {board.map((row, rowIndex) => (
                         row.map((cell, colIndex) => (
                             <Droppable
@@ -34,6 +34,8 @@ const Board = ({ board, onTileClick, isCurrentPlayerTurn, currentPlayer }) => {
                                             p-0.5 rounded cursor-pointer
                                             ${getBonusClassName(cell.bonus)}
                                         `}
+                                        data-testid={`cell-${rowIndex}-${colIndex}`}
+                                        role="gridcell"
                                     >
                                         {cell.tile ? (
                                             <Tile
