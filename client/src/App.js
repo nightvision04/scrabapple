@@ -48,7 +48,7 @@ function App() {
     // Create audio objects once and reuse them
     const tapSelectAudio = useRef(new Audio('/tap-select.mp3')).current;
     const tapPlaceAudio = useRef(new Audio('/tap-place.mp3')).current;
-    const endTurnAudio = useRef(new Audio('/stars_stereo.mp3')).current;
+    const endTurnAudio = useRef(new Audio('/stars.mp3')).current;
     const endGameAudio = useRef(new Audio('/end-game.mp3')).current;
 
     useEffect(() => {
@@ -723,8 +723,22 @@ function App() {
             setBag(gameState.bag);
             setGameStarted(gameState.gameStarted);
         });
-    
-        // ... other event listeners
+
+        newSocket.on('errorMessage', (message) => {
+            setError(message);
+        });
+
+        newSocket.on('boardUpdate', (newBoard) => {
+            setBoard(newBoard);
+        });
+
+        newSocket.on('rackUpdate', ({ playerId, rack }) => {
+            setPlayers(prevPlayers => {
+                const newPlayers = [...prevPlayers];
+                newPlayers[playerId] = { ...newPlayers[playerId], rack };
+                return newPlayers;
+            });
+        });
     
         return () => newSocket.close();
     };
