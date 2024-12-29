@@ -11,6 +11,7 @@ import Rack from './components/Rack/Rack';
 import Scoreboard from './components/Scoreboard/Scoreboard';
 import GameControls from './components/GameControls/GameControls';
 import Tile from './components/Tile/Tile';
+import TilesLeft from './components/TilesLeft/TilesLeft'; // Import TilesLeft component
 import { createEmptyBoard, createTileBag } from './utils';
 import { calculatePotentialScore, handlePlayWord, handleExchange, handlePass, handleShuffle, handleSelectBlankTile, handleNewGame } from './gameLogic';
 import { onDragEnd } from './dndHandlers';
@@ -216,9 +217,10 @@ function App() {
 
                     <div className="flex items-center justify-center text-xs gap-4">
                         <span>Score Bonus: {potentialScore !== 0 ? "+" : ''}{potentialScore !== 0 ? potentialScore : '-'}</span>
-                        <span>Tiles Left: {bag.length}</span>
+                        {/* Use the TilesLeft component here */}
+                        <TilesLeft board={board} players={players} gameStarted={gameStarted} />
                     </div>
-                    <DragDropContext onDragEnd={(result) => onDragEnd(result, board, players, currentPlayer, setBoard, setPlayers, setShowBlankTileModal, setBlankTilePosition, socket, updatePotentialScore)} backend={backend} options={backendOptions}>
+                    <DragDropContext onDragEnd={(result) => onDragEnd(result, board, players, currentPlayer, setBoard, setPlayers, setShowBlankTileModal, setBlankTilePosition, socket, updatePotentialScore, setSelectedTile)} backend={backend} options={backendOptions}>
                         <Droppable droppableId="board">
                             {(provided) => (
                                 <Board

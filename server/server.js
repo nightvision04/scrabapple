@@ -75,6 +75,7 @@ const createTileBag = () => {
         'V': 2, 'W': 2, 'X': 1, 'Y': 2, 'Z': 1, 
         // '_': 2
     };
+
     const bag = [];
     for (const letter in distribution) {
         for (let i = 0; i < distribution[letter]; i++) {
