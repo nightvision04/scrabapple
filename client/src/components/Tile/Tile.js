@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { Draggable } from 'react-beautiful-dnd';
 import { LETTER_VALUES } from '../../constants';
 
-const Tile = ({ value, isSelected, onTileClick, draggableId, index }) => {
+const Tile = forwardRef(({ value, isSelected, onTileClick, draggableId, index }, ref) => {
     const tileContent = (
         <div
             className={`
@@ -41,18 +41,15 @@ const Tile = ({ value, isSelected, onTileClick, draggableId, index }) => {
                         {...provided.dragHandleProps}
                         className="aspect-square p-0.5"
                     >
-                        {tileContent}
+                        {/* Apply ref directly to tileContent */}
+                        {React.cloneElement(tileContent, { ref })}
                     </div>
                 )}
             </Draggable>
         );
     }
 
-    return (
-        <div className="aspect-square p-0.5">
-            {tileContent}
-        </div>
-    );
-};
+    return tileContent;
+});
 
 export default Tile;

@@ -26,7 +26,6 @@ const Board = ({ board, onTileClick, isCurrentPlayerTurn, currentPlayer }) => {
                             >
                                 {(provided) => (
                                     <div
-                                        ref={provided.innerRef}
                                         {...provided.droppableProps}
                                         onClick={() => handleTileClick(rowIndex, colIndex)}
                                         className={`
@@ -36,22 +35,25 @@ const Board = ({ board, onTileClick, isCurrentPlayerTurn, currentPlayer }) => {
                                         `}
                                         data-testid={`cell-${rowIndex}-${colIndex}`}
                                         role="gridcell"
+                                        ref={provided.innerRef}
                                     >
-                                        {cell.tile ? (
+                                        {/* Only render Tile if cell.tile is not null */}
+                                        {cell.tile && (
                                             <Tile
-                                                value={cell.original || isCurrentPlayerTurn ? cell.tile : '?'}
+                                                value={cell.tile}
                                                 isSelected={false}
                                             />
-                                        ) : (
+                                        )}
+                                        {/* Render other content (bonus, center star) */}
+                                        {!cell.tile && (
                                             <>
-                                                {rowIndex === 7 && colIndex === 7 ? (
+                                                {rowIndex === 7 && colIndex === 7 && (
                                                     <span className="bg-pink-300 text-pink-900 hover:bg-pink-200 text-[8px]">★</span>
-                                                ) : (
-                                                    cell.bonus && (
-                                                        <div className="text-[8px] leading-none text-center font-medium">
-                                                            {getBonusText(cell.bonus)}
-                                                        </div>
-                                                    )
+                                                )}
+                                                {cell.bonus && !cell.tile && (
+                                                    <div className="text-[8px] leading-none text-center font-medium">
+                                                        {getBonusText(cell.bonus)}
+                                                    </div>
                                                 )}
                                             </>
                                         )}
