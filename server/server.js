@@ -1,3 +1,4 @@
+// server.js
 const express = require("express");
 const http = require("http");
 const socketIo = require("socket.io");
@@ -77,15 +78,6 @@ io.on("connection", (socket) => {
       if (player1Socket) {
         console.log("Player 1 socket:", player1Socket.id);
         player1Socket.join(gameId);
-
-        // Update socketId for player1 in the game
-        const game = getGame(gameId);
-        game.players[0].socketId = player1Socket.id;
-
-        player1Socket.emit("gameUpdate", {
-          ...getGame(gameId),
-          gameId: gameId,
-        });
       } else {
         console.error("Error: Could not find socket for player 1");
       }
@@ -93,18 +85,36 @@ io.on("connection", (socket) => {
       if (player2Socket) {
         console.log("Player 2 socket:", player2Socket.id);
         player2Socket.join(gameId);
-
-        // Update socketId for player2 in the game
-        const game = getGame(gameId);
-        game.players[1].socketId = player2Socket.id;
-
-        player2Socket.emit("gameUpdate", {
-          ...getGame(gameId),
-          gameId: gameId,
-        });
       } else {
         console.error("Error: Could not find socket for player 2");
       }
+
+      // Update socketId and player index for each player in the game
+      const game = getGame(gameId);
+
+      game.players[0].socketId = player1Socket.id;
+      game.players[0].playerId = player1;
+      game.players[1].socketId = player2Socket.id;
+      game.players[1].playerId = player2;
+      game.currentPlayer = 0; // Set initial currentPlayer to 0 (player 1) when creating the game
+
+      // Set gameStarted to true when the game is created and players are matched
+      game.gameStarted = true;
+
+      // Send gameUpdate to each player
+      player1Socket.emit("gameUpdate", {
+          ...getGame(gameId),
+          gameId: gameId,
+      });
+
+      player2Socket.emit("gameUpdate", {
+        ...getGame(gameId),
+        gameId: gameId,
+      });
+
+      // Emit gameReady to both players when both are ready
+      io.to(gameId).emit('gameReady');
+      console.log(`Game ${gameId} is starting with players ${player1} and ${player2}`);
     }
   });
 
@@ -143,67 +153,79 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("updateRack", ({ gameId, playerId, rack }) => {
-    console.log("Updating rack:", playerId, rack);
-    console.log("Game ID:", gameId);
+  socket.on("updateRack", ({ gameId, playerId, rack, currentPlayer }) => {
+    console.log("Updating rack for player:", playerId, "in game:", gameId);
+    console.log("Received rack:", rack);
+    console.log("Current player from client:", currentPlayer);
+
     const game = getGame(gameId);
     if (game) {
-      console.log("Game found in updateRack");
-
-      // Find the player using the actual playerId, not the currentPlayer index
       const playerIndex = game.players.findIndex((p) => p.playerId === playerId);
-
-      console.log("Player index in updateRack:", playerIndex);
       if (playerIndex !== -1) {
-        console.log("Updating rack for player:", playerId);
         game.players[playerIndex].rack = rack;
-        console.log("Updated rack:", game.players[playerIndex].rack);
-        socket
-          .to(gameId)
-          .emit("rackUpdate", { playerId, rack });
-        console.log("Emitted rack update");
+
+        // Log the current player before the update
+        console.log("Current player before update:", game.currentPlayer);
+
+        // Emit rackUpdate to other players in the game
+        socket.to(gameId).emit("rackUpdate", { playerId, rack });
+        console.log("Updated rack and emitted rackUpdate to game:", gameId);
       } else {
         console.error("Error: Could not find player to update rack:", playerId);
       }
     } else {
-      console.error("Error: Could not find game to update rack");
+      console.error("Error: Could not find game to update rack:", gameId);
     }
   });
 
   socket.on("playWord", (data) => {
     console.log("Playing word");
-    const { gameId, board, players, currentPlayer, bag } = data;
+    const { gameId, board, players, currentPlayer, bag, newTiles } = data;
+    console.log("Received gameId:", gameId);
+    console.log("Received board:", board);
+    console.log("Received players:", players);
+    console.log("Received currentPlayer:", currentPlayer);
+    console.log("Received bag:", bag);
+    console.log("Received newTiles:", newTiles);
 
     const game = getGame(gameId);
     if (game) {
-      // Find the player index based on currentPlayer
-      const playerIndex = currentPlayer;
+        // Find the player index based on currentPlayer
+        const playerIndex = currentPlayer;
 
-      // Update the board and bag in the game
-      game.board = board;
-      game.bag = bag;
+        // Update the board and bag in the game
+        game.board = board;
+        game.bag = bag;
 
-      // Update the current player's score
-      if (players && players[playerIndex]) {
-        game.players[playerIndex].score = players[playerIndex].score;
-      } else {
-        console.error("Error: Invalid player data received for playWord");
-        return;
-      }
+        // Update the current player's score and rack
+        if (players && players[playerIndex]) {
+            game.players[playerIndex].score = players[playerIndex].score;
+            game.players[playerIndex].rack = players[playerIndex].rack;
+        } else {
+            console.error("Error: Invalid player data received for playWord");
+            return;
+        }
 
-      // Switch to the next player
-      game.currentPlayer = (currentPlayer + 1) % 2;
+        // Switch to the next player
+        const nextPlayer = (currentPlayer + 1) % 2;
+        game.currentPlayer = nextPlayer;
 
-      // Update the game state
-      updateGame(gameId, game);
+        // Update the game state
+        updateGame(gameId, game);
 
-      // Emit the updated game state
-      console.log("Updated game");
-      io.to(gameId).emit("gameUpdate", game);
+        // Emit the updated game state with newTiles for the current player
+        console.log("Updated game");
+        io.to(gameId).emit("gameUpdate", {
+            ...game,
+            newTiles: newTiles // Include new tiles in the game update
+        });
+
+        // Explicitly emit a turn update event after the game state has been updated
+        io.to(gameId).emit("turnUpdate", game.currentPlayer);
     } else {
-      console.error("Error: Game not found for gameId:", gameId);
+        console.error("Error: Game not found for gameId:", gameId);
     }
-  });
+});
 
   socket.on("exchangeTile", (data) => {
     console.log("Exchanging tile:", data);
@@ -252,34 +274,33 @@ io.on("connection", (socket) => {
       const playerIndex = game.players.findIndex((p) => p.playerId === playerId);
       if (playerIndex !== -1) {
         game.players[playerIndex].rack = rack;
-        socket.emit("rackUpdate", { playerId, rack });
-      } else {
-        console.error("Error: Could not find player to shuffle rack:", playerId);
-      }
-    } else {
-      console.error("Error: Could not find game to shuffle rack");
-    }
-  });
-
-  socket.on("removeGame", (gameId) => {
-    console.log("Removing game:", gameId);
-    const game = getGame(gameId);
-    if (game) {
-      console.log("Game removed:", gameId);
-      io.to(gameId).emit("gameOver", game);
-      removeGame(gameId);
-    }
-  });
-
-  socket.on("disconnect", () => {
-    console.log("Client disconnected:", socket.id);
-    if (socket.playerId) {
-      removePlayerFromQueue(socket.playerId);
-    }
-  });
-});
-
-// Bind server to 0.0.0.0 to listen on all interfaces
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server listening on port ${PORT}`);
-});
+        socket.emit("rackUpdate", { playerId, rack });      } else {
+            console.error("Error: Could not find player to shuffle rack:", playerId);
+          }
+        } else {
+          console.error("Error: Could not find game to shuffle rack");
+        }
+      });
+    
+      socket.on("removeGame", (gameId) => {
+        console.log("Removing game:", gameId);
+        const game = getGame(gameId);
+        if (game) {
+          console.log("Game removed:", gameId);
+          io.to(gameId).emit("gameOver", game);
+          removeGame(gameId);
+        }
+      });
+    
+      socket.on("disconnect", () => {
+        console.log("Client disconnected:", socket.id);
+        if (socket.playerId) {
+          removePlayerFromQueue(socket.playerId);
+        }
+      });
+    });
+    
+    // Bind server to 0.0.0.0 to listen on all interfaces
+    server.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server listening on port ${PORT}`);
+    });

@@ -1,3 +1,4 @@
+//App.js
 import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import { DragDropContext, Droppable } from 'react-beautiful-dnd';
@@ -9,8 +10,8 @@ import Scoreboard from './components/Scoreboard/Scoreboard';
 import GameControls from './components/GameControls/GameControls';
 import Tile from './components/Tile/Tile';
 import TilesLeft from './components/TilesLeft/TilesLeft';
-import { createEmptyBoard, setCookie, getCookie } from './utils';
-import { calculatePotentialScore, handlePlayWord, handleExchange, handlePass, handleShuffle, handleSelectBlankTile, handleNewGame } from './gameLogic';
+import { createEmptyBoard, setCookie, getCookie, calculateScore, isValidWord, drawTiles } from './utils';
+import { calculatePotentialScore, handleExchange, handlePass, handleShuffle, handleSelectBlankTile, handleNewGame } from './gameLogic';
 import { onDragEnd } from './dndHandlers';
 import { useAudioPlayers, playAudio } from './audioUtils';
 import './App.css';
@@ -19,6 +20,7 @@ import StarEffects from './components/Effects/StarEffects';
 import YourTurnEffect from './components/Effects/YourTurnEffect';
 import EndScreen from './components/EndScreen/EndScreen';
 import Waiting from './components/Waiting/Waiting';
+
 
 export const SERVER_URL = 'http://10.0.0.82:8080';
 
@@ -73,6 +75,7 @@ function App() {
         newSocket.on('gameUpdate', (gameState) => {
             console.log("Received gameUpdate:", gameState);
             console.log("Received gameUpdate board:", gameState.board);
+            console.log("Received currentPlayer in gameUpdate:", gameState.currentPlayer);
 
             // Ensure players is always an array and has the correct structure
             const updatedPlayers = gameState.players
@@ -92,6 +95,16 @@ function App() {
             setGameStarted(gameState.gameStarted);
             console.log("Game started:", gameState.gameStarted);
             setGameId(gameState.gameId);
+
+            // Check if new tiles are drawn for the current player and it's their turn
+            if (gameState.newTiles && gameState.currentPlayer === updatedPlayers.findIndex(p => p.playerId === playerId)) {
+                console.log("New tiles from gameUpdate:", gameState.newTiles);
+                const playerIndex = updatedPlayers.findIndex(p => p.playerId === playerId);
+                if (playerIndex !== -1) {
+                    updatedPlayers[playerIndex].rack.push(...gameState.newTiles);
+                    setPlayers(updatedPlayers);
+                }
+            }
         });
 
         newSocket.on('errorMessage', (message) => {
@@ -117,6 +130,15 @@ function App() {
         newSocket.on('gameOver', (gameState) => {
             setGameOver(true);
             setGameId(null);
+        });
+
+        newSocket.on('gameReady', () => {
+            setGameStarted(true);
+            // setGameReady(true);
+        });
+
+        newSocket.on('turnUpdate', (currentPlayer) => {
+            setCurrentPlayer(currentPlayer);
         });
 
         return () => newSocket.close();
@@ -153,7 +175,7 @@ function App() {
     };
 
     const handleBoardTileClick = (row, col, existingTile) => {
-        if (!isCurrentPlayerTurn) return;
+        if (!isCurrentPlayerTurn()) return;
 
         if (existingTile) {
             if (existingTile.originalTileValue && existingTile.originalTileValue === '_') {
@@ -229,24 +251,20 @@ function App() {
     };
 
     const isCurrentPlayerTurn = () => {
-        if (!gameStarted || !socket || players.length === 0) {
+        if (!gameStarted || !socket || players.length < 2) {
             return false;
         }
-    
-        const currentPlayerObj = players.find(p => p.playerId === playerId);
-        if (!currentPlayerObj) {
-            return false;
-        }
-    
-        // Check if the current player's socketId matches the connected socket's id
-        return currentPlayerObj.socketId === socket.id;
+
+        // Check if the current player's ID matches the ID of the player whose turn it is
+        return players[currentPlayer]?.playerId === playerId;
     };
 
-    console.log("isCurrentPlayerTurn:", isCurrentPlayerTurn);
+    console.log("isCurrentPlayerTurn:", isCurrentPlayerTurn());
     console.log("gameStarted:", gameStarted);
     console.log("socket:", socket);
     console.log("players:", players);
     console.log("currentPlayer:", currentPlayer);
+    console.log("playerId:", playerId);
     if (players.length > 0 && players[currentPlayer]) {
         console.log("players[currentPlayer].socketId:", players[currentPlayer].socketId);
     }
@@ -257,6 +275,160 @@ function App() {
     };
 
     const backend = isTouchDevice() ? TouchBackend : HTML5Backend;
+
+    const handlePlayWord = async (gameId, board, players, currentPlayer, bag, socket, setTurnEndScore, setShowStarEffects, setPlayEndTurnAudio, setCurrentPlayer, setSelectedTile, setPotentialScore, setBag, setBoard) => {
+        const playedTiles = [];
+        for (let i = 0; i < 15; i++) {
+            for (let j = 0; j < 15; j++) {
+                if (board[i][j].tile && !board[i][j].original) {
+                    playedTiles.push({ row: i, col: j, tile: board[i][j].tile });
+                }
+            }
+        }
+
+        if (playedTiles.length === 0) {
+            alert("No tiles have been played.");
+            return;
+        }
+
+        const isHorizontal = playedTiles.length === 1 || playedTiles.every(tile => tile.row === playedTiles[0].row);
+        const isVertical = playedTiles.length === 1 || playedTiles.every(tile => tile.col === playedTiles[0].col);
+
+        if (!isHorizontal && !isVertical) {
+            alert("Invalid word placement. Tiles must be in a straight line.");
+            return;
+        }
+
+        playedTiles.sort((a, b) => isHorizontal ? a.col - b.col : a.row - b.row);
+
+        let allWords = [];
+        let totalScore = 0;
+
+        const addWordAndScore = (newWord, tiles) => {
+            if (newWord.length > 1) {
+                allWords.push(newWord);
+                totalScore += calculateScore(tiles, board);
+            }
+        };
+
+        const processWord = (currentRow, currentCol, isMainWord = false) => {
+            let tempWord = "";
+            let tempTiles = [];
+            let i = currentRow;
+            let j = currentCol;
+
+            if (isMainWord) {
+                if (isHorizontal) {
+                    while (j >= 0 && board[i][j].tile) {
+                        j--;
+                    }
+                    j++;
+                    while (j < 15 && board[i][j].tile) {
+                        tempWord += board[i][j].tile;
+                        tempTiles.push({ row: i, col: j, tile: board[i][j].tile });
+                        j++;
+                    }
+                } else {
+                    while (i >= 0 && board[i][j].tile) {
+                        i--;
+                    }
+                    i++;
+                    while (i < 15 && board[i][j].tile) {
+                        tempWord += board[i][j].tile;
+                        tempTiles.push({ row: i, col: j, tile: board[i][j].tile });
+                        i++;
+                    }
+                }
+            } else {
+                if (!isHorizontal) {
+                    while (j >= 0 && board[i][j].tile) {
+                        j--;
+                    }
+                    j++;
+                    while (j < 15 && board[i][j].tile) {
+                        tempWord += board[i][j].tile;
+                        tempTiles.push({ row: i, col: j, tile: board[i][j].tile });
+                        j++;
+                    }
+                } else {
+                    while (i >= 0 && board[i][j].tile) {
+                        i--;
+                    }
+                    i++;
+                    while (i < 15 && board[i][j].tile) {
+                        tempWord += board[i][j].tile;
+                        tempTiles.push({ row: i, col: j, tile: board[i][j].tile });
+                        i++;
+                    }
+                }
+            }
+
+            if (tempWord.length > 1) {
+                addWordAndScore(tempWord, tempTiles);
+            }
+        };
+
+        let [startRow, startCol] = [playedTiles[0].row, playedTiles[0].col];
+        processWord(startRow, startCol, true);
+
+        for (let tile of playedTiles) {
+            if (isHorizontal) {
+                processWord(tile.row, tile.col, false);
+            } else {
+                processWord(tile.row, tile.col, false);
+            }
+        }
+
+        for (let word of allWords) {
+            if (!(await isValidWord(word, board))) {
+                alert(`Invalid word: "${word}"`);
+                return;
+            }
+        }
+
+        const newBoard = board.map(row => row.map(cell => ({
+            ...cell,
+            original: cell.original || (cell.tile !== null)
+        })));
+
+        // Set the turn end score
+        setTurnEndScore(totalScore);
+
+        // Trigger star effects and audio
+        setShowStarEffects(true);
+        setPlayEndTurnAudio(true);
+
+        // Delay for star animation and then switch to the next player
+        setTimeout(() => {
+            setShowStarEffects(false); // Hide star effects
+            const nextPlayer = (currentPlayer + 1) % 2;
+            // setCurrentPlayer(nextPlayer);
+            setSelectedTile(null);
+            setPotentialScore(0);
+
+            // Update the player's rack locally before sending the update
+            let updatedPlayers = [...players];
+            const tilesToDraw = Math.max(0, 7 - updatedPlayers[currentPlayer].rack.length);
+            const newTiles = drawTiles(bag, tilesToDraw);
+
+            updatedPlayers[currentPlayer].rack = [...updatedPlayers[currentPlayer].rack, ...newTiles];
+            updatedPlayers[currentPlayer].score += totalScore;
+
+            setPlayers(updatedPlayers);
+            setBag(bag.filter(tile => !newTiles.includes(tile)));
+            setBoard(newBoard);
+
+            // Update the game state on the server
+            socket.emit('playWord', {
+                gameId: gameId,
+                board: newBoard,
+                players: updatedPlayers,
+                currentPlayer: currentPlayer, // Send the current player, not the next player
+                bag: bag.filter(tile => !newTiles.includes(tile)),
+                newTiles: newTiles // Send new tiles drawn for the current player
+            });
+        }, 1500);
+    };
 
     return (
         <div className="app m-0 bg-amber-50">

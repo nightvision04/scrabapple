@@ -90,159 +90,6 @@ export const calculatePotentialScore = (board) => {
   return totalScore;
 };
 
-export const handlePlayWord = async (gameId, board, players, currentPlayer, bag, socket, setTurnEndScore, setShowStarEffects, setPlayEndTurnAudio, setCurrentPlayer, setSelectedTile, setPotentialScore, setBag, setBoard) => {
-  const playedTiles = [];
-  for (let i = 0; i < 15; i++) {
-      for (let j = 0; j < 15; j++) {
-          if (board[i][j].tile && !board[i][j].original) {
-              playedTiles.push({ row: i, col: j, tile: board[i][j].tile });
-          }
-      }
-  }
-
-  if (playedTiles.length === 0) {
-      alert("No tiles have been played.");
-      return;
-  }
-
-  const isHorizontal = playedTiles.length === 1 || playedTiles.every(tile => tile.row === playedTiles[0].row);
-  const isVertical = playedTiles.length === 1 || playedTiles.every(tile => tile.col === playedTiles[0].col);
-
-  if (!isHorizontal && !isVertical) {
-      alert("Invalid word placement. Tiles must be in a straight line.");
-      return;
-  }
-
-  playedTiles.sort((a, b) => isHorizontal ? a.col - b.col : a.row - b.row);
-
-  let allWords = [];
-  let totalScore = 0;
-
-  const addWordAndScore = (newWord, tiles) => {
-      if (newWord.length > 1) {
-          allWords.push(newWord);
-          totalScore += calculateScore(tiles, board);
-      }
-  };
-
-  const processWord = (currentRow, currentCol, isMainWord = false) => {
-      let tempWord = "";
-      let tempTiles = [];
-      let i = currentRow;
-      let j = currentCol;
-
-      if (isMainWord) {
-          if (isHorizontal) {
-              while (j >= 0 && board[i][j].tile) {
-                  j--;
-              }
-              j++;
-              while (j < 15 && board[i][j].tile) {
-                  tempWord += board[i][j].tile;
-                  tempTiles.push({ row: i, col: j, tile: board[i][j].tile });
-                  j++;
-              }
-          } else {
-              while (i >= 0 && board[i][j].tile) {
-                  i--;
-              }
-              i++;
-              while (i < 15 && board[i][j].tile) {
-                  tempWord += board[i][j].tile;
-                  tempTiles.push({ row: i, col: j, tile: board[i][j].tile });
-                  i++;
-              }
-          }
-      } else {
-          if (!isHorizontal) {
-              while (j >= 0 && board[i][j].tile) {
-                  j--;
-              }
-              j++;
-              while (j < 15 && board[i][j].tile) {
-                  tempWord += board[i][j].tile;
-                  tempTiles.push({ row: i, col: j, tile: board[i][j].tile });
-                  j++;
-              }
-          } else {
-              while (i >= 0 && board[i][j].tile) {
-                  i--;
-              }
-              i++;
-              while (i < 15 && board[i][j].tile) {
-                  tempWord += board[i][j].tile;
-                  tempTiles.push({ row: i, col: j, tile: board[i][j].tile });
-                  i++;
-              }
-          }
-      }
-
-      if (tempWord.length > 1) {
-          addWordAndScore(tempWord, tempTiles);
-      }
-  };
-
-  let [startRow, startCol] = [playedTiles[0].row, playedTiles[0].col];
-  processWord(startRow, startCol, true);
-
-  for (let tile of playedTiles) {
-      if (isHorizontal) {
-          processWord(tile.row, tile.col, false);
-      } else {
-          processWord(tile.row, tile.col, false);
-      }
-  }
-
-  for (let word of allWords) {
-      if (!(await isValidWord(word, board))) {
-          alert(`Invalid word: "${word}"`);
-          return;
-      }
-  }
-
-  const newBoard = board.map(row => row.map(cell => ({
-      ...cell,
-      original: cell.original || (cell.tile !== null)
-  })));
-
-  // Set the turn end score
-  setTurnEndScore(totalScore);
-
-  // Trigger star effects and audio
-  setShowStarEffects(true);
-  setPlayEndTurnAudio(true);
-
-  // Delay for star animation and then switch to the next player
-  setTimeout(() => {
-      setShowStarEffects(false); // Hide star effects
-      const nextPlayer = (currentPlayer + 1) % 2;
-      setCurrentPlayer(nextPlayer);
-      setSelectedTile(null);
-      setPotentialScore(0);
-
-      let updatedPlayers = [...players];
-      const tilesToDraw = Math.max(0, 7 - updatedPlayers[currentPlayer].rack.length);
-      const newTiles = drawTiles(bag, tilesToDraw);
-      updatedPlayers[currentPlayer].rack = [...updatedPlayers[currentPlayer].rack, ...newTiles];
-
-      setBag(bag.filter(tile => !newTiles.includes(tile)));
-      setBoard(newBoard);
-
-      // Update the game state on the server
-      socket.emit('playWord', {
-        gameId: gameId,
-          board: newBoard,
-          players: updatedPlayers.map((player, index) =>
-              index === currentPlayer
-                  ? { ...player, score: player.score + totalScore }
-                  : player
-          ),
-          currentPlayer: nextPlayer,
-          bag: bag.filter(tile => !newTiles.includes(tile))
-      });
-  }, 1500);
-};
-
 export const handleExchange = (gameId, selectedTile, players, currentPlayer, board, setBoard, setPlayers, setSelectedTile, setPotentialScore, setCurrentPlayer, socket) => {
   if (selectedTile && selectedTile.from.type === 'rack') {
     const tileToExchange = selectedTile.tile;
@@ -341,11 +188,11 @@ export const handleShuffle = (gameId, players, currentPlayer, setPlayers, socket
         const j = Math.floor(Math.random() * (i + 1));
         [currentRack[i], currentRack[j]] = [currentRack[j], currentRack[i]];
     }
-  
+
     const updatedPlayers = [...players];
     updatedPlayers[currentPlayer] = { ...players.find(p => p.playerId === currentPlayer), rack: currentRack };
     setPlayers(updatedPlayers);
-  
+
     socket.emit('shuffleRack', {
         gameId: gameId,
         playerId: currentPlayer,
@@ -385,12 +232,12 @@ export const handleSelectBlankTile = (letter, blankTilePosition, board, setBoard
 export const handleNewGame = (gameId, setBoard, setPlayers, setCurrentPlayer, setBag, setSelectedTile, setGameStarted, setError, setPotentialScore, setShowBlankTileModal, setBlankTilePosition, setTurnEndScore, setShowStarEffects, setPlayEndTurnAudio, setGameOver, setSocket, SERVER_URL) => {
     // Get the current socket instance from the state
     const currentSocket = setSocket;
-  
+
     // Emit a signal to the server to remove the current game
     if (gameId && currentSocket) {
         currentSocket.emit('removeGame', gameId);
     }
-  
+
     // Reset the game state
     setBoard(createEmptyBoard());
     setPlayers([
@@ -409,19 +256,19 @@ export const handleNewGame = (gameId, setBoard, setPlayers, setCurrentPlayer, se
     setShowStarEffects(false);
     setPlayEndTurnAudio(false);
     setGameOver(false);
-  
+
     // Reconnect to the server
     const newSocket = io(SERVER_URL);
     setSocket(newSocket);
-  
+
     const playerId = getCookie('player-id');
-  
+
     newSocket.on('connect', () => {
         if (playerId) {
             newSocket.emit('joinGame', playerId);
         }
     });
-  
+
     // Set up other event listeners as before
     newSocket.on('gameUpdate', (gameState) => {
         setBoard(gameState.board);
@@ -430,15 +277,15 @@ export const handleNewGame = (gameId, setBoard, setPlayers, setCurrentPlayer, se
         setBag(gameState.bag);
         setGameStarted(gameState.gameStarted);
     });
-  
+
     newSocket.on('errorMessage', (message) => {
         setError(message);
     });
-  
+
     newSocket.on('boardUpdate', (newBoard) => {
         setBoard(newBoard);
     });
-  
+
     newSocket.on('rackUpdate', ({ playerId, rack }) => {
         setPlayers(prevPlayers => {
             const newPlayers = [...prevPlayers];
@@ -446,6 +293,6 @@ export const handleNewGame = (gameId, setBoard, setPlayers, setCurrentPlayer, se
             return newPlayers;
         });
     });
-  
+
     return () => newSocket.close();
   };

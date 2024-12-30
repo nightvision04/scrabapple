@@ -1,3 +1,4 @@
+// dndHandlers.js
 export const onDragEnd = (result, board, players, currentPlayer, setBoard, setPlayers, setShowBlankTileModal, setBlankTilePosition, socket, updatePotentialScore, setSelectedTile, gameId, playerId) => {
     const { destination, source } = result;
 
@@ -15,7 +16,7 @@ export const onDragEnd = (result, board, players, currentPlayer, setBoard, setPl
         const updatedPlayers = [...players];
         updatedPlayers[currentPlayer] = { ...players.find(p => p.playerId === playerId), rack: newRack };
         setPlayers(updatedPlayers);
-        socket.emit('updateRack', { gameId: gameId, playerId: playerId, rack: newRack });
+        socket.emit('updateRack', { gameId: gameId, playerId: playerId, rack: newRack, currentPlayer: currentPlayer });
         return;
     }
 
@@ -49,7 +50,7 @@ export const onDragEnd = (result, board, players, currentPlayer, setBoard, setPl
         setPlayers(updatedPlayers);
 
         socket.emit('updateBoard', newBoard);
-        socket.emit('updateRack', { gameId: gameId, playerId: playerId, rack: newRack });
+        socket.emit('updateRack', { gameId: gameId, playerId: playerId, rack: newRack, currentPlayer: currentPlayer });
     }
 
     if (source.droppableId.startsWith('cell-') && destination.droppableId === 'rack') {
@@ -70,7 +71,7 @@ export const onDragEnd = (result, board, players, currentPlayer, setBoard, setPl
             setPlayers(updatedPlayers);
 
             socket.emit('updateBoard', newBoard);
-            socket.emit('updateRack', { gameId: gameId, playerId: playerId, rack: newRack });
+            socket.emit('updateRack', { gameId: gameId, playerId: playerId, rack: newRack, currentPlayer: currentPlayer });
         } else {
             const newBoard = [...board];
             newBoard[sourceRow][sourceCol] = { tile: null, bonus: newBoard[sourceRow][sourceCol].bonus, original: false };
@@ -85,7 +86,7 @@ export const onDragEnd = (result, board, players, currentPlayer, setBoard, setPl
             setPlayers(updatedPlayers);
 
             socket.emit('updateBoard', newBoard);
-            socket.emit('updateRack', { gameId: gameId, playerId: playerId, rack: newRack });
+            socket.emit('updateRack', { gameId: gameId, playerId: playerId, rack: newRack, currentPlayer: currentPlayer });
         }
     }
     updatePotentialScore();
