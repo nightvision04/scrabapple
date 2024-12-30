@@ -1,22 +1,28 @@
-const express = require('express');
-const http = require('http');
-const socketIo = require('socket.io');
-const cors = require('cors');
-const fs = require('fs');
-const path = require('path');
+const express = require("express");
+const http = require("http");
+const socketIo = require("socket.io");
+const cors = require("cors");
+const fs = require("fs");
+const path = require("path");
+const {
+  getGame,
+  removeGame,
+  addPlayerToQueue,
+  removePlayerFromQueue,
+  matchPlayers,
+  updateGame,
+} = require("./gameManager");
 
 const app = express();
 const server = http.createServer(app);
 
-app.use(cors({
-    origin: "*"
-}));
+app.use(cors({ origin: "*" }));
 
 const io = socketIo(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
 });
 
 const PORT = 8080;
@@ -24,195 +30,256 @@ const PORT = 8080;
 // Load dictionary
 const dictionary = new Set();
 try {
-    const dictPath = path.join(__dirname, 'words.txt');
-    const dictData = fs.readFileSync(dictPath, 'utf8');
-    dictData.split(/\r?\n/).forEach(word => dictionary.add(word.trim().toLowerCase()));
+  const dictPath = path.join(__dirname, "words.txt");
+  const dictData = fs.readFileSync(dictPath, "utf8");
+  dictData.split(/\r?\n/).forEach((word) => dictionary.add(word.trim().toLowerCase()));
 } catch (err) {
-    console.error("Error loading dictionary:", err);
+  console.error("Error loading dictionary:", err);
 }
 
-const BOARD_BONUSES = {
-    '7,7': 'dw', '0,0': 'tw', '0,7': 'tw', '0,14': 'tw',
-    '7,0': 'tw', '7,14': 'tw', '14,0': 'tw',
-    '14,7': 'tw', '14,14': 'tw',
-    '1,1': 'dw', '2,2': 'dw', '3,3': 'dw',
-    '4,4': 'dw', '10,10': 'dw', '11,11': 'dw',
-    '12,12': 'dw', '13,13': 'dw', '1,13': 'dw',
-    '2,12': 'dw', '3,11': 'dw', '4,10': 'dw',
-    '10,4': 'dw', '11,3': 'dw', '12,2': 'dw',
-    '13,1': 'dw',
-    '1,5': 'dl', '1,9': 'dl', '5,1': 'dl',
-    '5,5': 'dl', '5,9': 'dl', '5,13': 'dl',
-    '9,1': 'dl', '9,5': 'dl', '9,9': 'dl',
-    '9,13': 'dl', '13,5': 'dl', '13,9': 'dl',
-    '0,3': 'tl', '0,11': 'tl', '2,6': 'tl',
-    '2,8': 'tl', '3,0': 'tl', '3,7': 'tl',
-    '3,14': 'tl', '6,2': 'tl', '6,6': 'tl',
-    '6,8': 'tl', '6,12': 'tl', '7,3': 'tl',
-    '7,11': 'tl', '8,2': 'tl', '8,6': 'tl',
-    '8,8': 'tl', '8,12': 'tl', '11,0': 'tl',
-    '11,7': 'tl', '11,14': 'tl', '12,6': 'tl',
-    '12,8': 'tl', '14,3': 'tl', '14,11': 'tl'
-};
-
-const createEmptyBoard = () => {
-    const board = [];
-    for (let i = 0; i < 15; i++) {
-        board[i] = [];
-        for (let j = 0; j < 15; j++) {
-            const coord = `${i},${j}`;
-            board[i][j] = { tile: null, bonus: BOARD_BONUSES[coord] || null };
-        }
-    }
-    return board;
-};
-
-const createTileBag = () => {
-    const distribution = {
-        'A': 9, 'B': 2, 'C': 2, 'D': 4, 'E': 12, 'F': 2, 'G': 3,
-        'H': 2, 'I': 9, 'J': 1, 'K': 1, 'L': 4, 'M': 2, 'N': 6,
-        'O': 8, 'P': 2, 'Q': 1, 'R': 6, 'S': 4, 'T': 6, 'U': 4,
-        'V': 2, 'W': 2, 'X': 1, 'Y': 2, 'Z': 1, 
-        // '_': 2
-    };
-
-    const bag = [];
-    for (const letter in distribution) {
-        for (let i = 0; i < distribution[letter]; i++) {
-            bag.push(letter);
-        }
-    }
-    return bag;
-};
-
-const drawTiles = (bag, num) => {
-    const drawn = [];
-    for (let i = 0; i < num; i++) {
-        if (bag.length > 0) {
-            const randomIndex = Math.floor(Math.random() * bag.length);
-            drawn.push(bag.splice(randomIndex, 1)[0]);
-        }
-    }
-    return drawn;
-};
-
-let gameState = {
-    board: createEmptyBoard(),
-    players: [
-        { score: 0, rack: [], socketId: null },
-        { score: 0, rack: [], socketId: null }
-    ],
-    currentPlayer: 0,
-    bag: createTileBag(),
-    gameStarted: false
-};
-
-let connectedPlayers = 0;
-
-const sendGameStateToPlayer = (socket, playerId) => {
-    const playerSpecificGameState = {
-        ...gameState,
-        players: gameState.players.map((player, index) => ({
-            score: player.score,
-            rack: index === playerId ? player.rack : []
-        }))
-    };
-
-    socket.emit('gameUpdate', playerSpecificGameState);
-};
-
 // Add the route handler for /validate-word/:word
-app.get('/validate-word/:word', (req, res) => {
-    const word = req.params.word.toLowerCase();
-    const isValid = dictionary.has(word);
-    res.json({ isValid });
+app.get("/validate-word/:word", (req, res) => {
+  console.log("Validating word:", req.params.word);
+  const word = req.params.word.toLowerCase();
+  const isValid = dictionary.has(word);
+  res.json({ isValid });
 });
 
-io.on('connection', (socket) => {
-    console.log('New client connected:', socket.id);
-    connectedPlayers++;
+// Helper function to find sockets by playerId
+function findSocketByPlayerId(playerId) {
+  for (const [id, socket] of io.sockets.sockets) {
+    if (socket.playerId === playerId) {
+      return socket;
+    }
+  }
+  return null; // Socket not found
+}
 
-    socket.on('joinGame', () => {
-        if (connectedPlayers <= 2) {
-            const playerId = gameState.players.findIndex(player => player.rack.length === 0);
-            if (playerId !== -1) {
-                gameState.players[playerId].socketId = socket.id; // Assign socketId here
-                gameState.players[playerId].rack = drawTiles(gameState.bag, 7);
-                sendGameStateToPlayer(socket, playerId);
-            }
+io.on("connection", (socket) => {
+  console.log("New client connected:", socket.id);
 
-            if (connectedPlayers === 2) {
-                gameState.gameStarted = true;
-                io.emit('gameUpdate', gameState);
-            }
-        } else {
-            socket.emit('errorMessage', 'Game is full');
-        }
-    });
+  socket.on("joinGame", (playerId) => {
+    console.log("Player joined game:", playerId);
 
-    socket.on('updateBoard', (newBoard) => {
-        gameState.board = newBoard;
-        socket.broadcast.emit('boardUpdate', newBoard);
-    });
+    // Set playerId on the socket *before* adding to the queue
+    socket.playerId = playerId;
+    addPlayerToQueue(playerId);
 
-    socket.on('updateRack', ({ playerId, rack }) => {
-        gameState.players[playerId].rack = rack;
-        socket.broadcast.emit('rackUpdate', { playerId, rack });
-    });
+    const matchedPlayers = matchPlayers();
+    if (matchedPlayers) {
+      console.log("Matched players:", matchedPlayers);
+      const { gameId, player1, player2 } = matchedPlayers;
 
-    socket.on('playWord', (newGameState) => {
-        // Update only the necessary parts of the gameState
-        gameState.board = newGameState.board;
-        gameState.players = newGameState.players;
-        gameState.currentPlayer = newGameState.currentPlayer;
+      // Correctly find the sockets for player1 and player2
+      const player1Socket = findSocketByPlayerId(player1);
+      const player2Socket = findSocketByPlayerId(player2);
 
-        // Refill the current player's rack
-        const currentPlayer = gameState.currentPlayer;
-        const tilesNeeded = 7 - gameState.players[currentPlayer].rack.length;
-        const newTiles = drawTiles(gameState.bag, tilesNeeded);
-        gameState.players[currentPlayer].rack.push(...newTiles);
+      if (player1Socket) {
+        console.log("Player 1 socket:", player1Socket.id);
+        player1Socket.join(gameId);
 
-        // Emit the updated game state
-        io.emit('gameUpdate', gameState);
-    });
+        // Update socketId for player1 in the game
+        const game = getGame(gameId);
+        game.players[0].socketId = player1Socket.id;
 
-    socket.on('exchangeTile', ({ playerId, rack, tileToExchange, currentPlayer }) => {
-        gameState.bag.push(tileToExchange);
-        const newTiles = drawTiles(gameState.bag, 1);
-        gameState.players[playerId].rack = [...rack, ...newTiles];
-        gameState.currentPlayer = currentPlayer;
-        io.emit('gameUpdate', gameState);
-    });
+        player1Socket.emit("gameUpdate", {
+          ...getGame(gameId),
+          gameId: gameId,
+        });
+      } else {
+        console.error("Error: Could not find socket for player 1");
+      }
 
-    socket.on('passTurn', ({ currentPlayer }) => {
-        gameState.currentPlayer = currentPlayer;
-        io.emit('gameUpdate', gameState);
-    });
+      if (player2Socket) {
+        console.log("Player 2 socket:", player2Socket.id);
+        player2Socket.join(gameId);
 
-    socket.on('shuffleRack', ({ playerId, rack }) => {
-        gameState.players[playerId].rack = rack;
-        socket.emit('rackUpdate', { playerId, rack });
-    });
+        // Update socketId for player2 in the game
+        const game = getGame(gameId);
+        game.players[1].socketId = player2Socket.id;
 
-    socket.on('disconnect', () => {
-        console.log('Client disconnected:', socket.id);
-        connectedPlayers--;
-        if (connectedPlayers === 0) {
-            gameState = {
-                board: createEmptyBoard(),
-                players: [
-                    { score: 0, rack: [], socketId: null },
-                    { score: 0, rack: [], socketId: null }
-                ],
-                currentPlayer: 0,
-                bag: createTileBag(),
-                gameStarted: false
-            };
-        }
-    });
+        player2Socket.emit("gameUpdate", {
+          ...getGame(gameId),
+          gameId: gameId,
+        });
+      } else {
+        console.error("Error: Could not find socket for player 2");
+      }
+    }
+  });
+
+  socket.on("rejoinGame", (playerId) => {
+    console.log("Player rejoining game:", playerId);
+    let playerFound = false;
+    for (const gameId in activeGames) {
+      const game = activeGames[gameId];
+      if (game.players.find((p) => p.playerId === playerId)) {
+        console.log("Player found in game:", gameId);
+        socket.join(gameId);
+
+        // Update socketId for rejoined player
+        game.players.find((p) => p.playerId === playerId).socketId = socket.id;
+
+        socket.emit("gameUpdate", { ...game, gameId });
+        playerFound = true;
+        break;
+      }
+    }
+    if (!playerFound) {
+      console.log("Player not found in any game:", playerId);
+      addPlayerToQueue(playerId);
+      socket.playerId = playerId;
+    }
+  });
+
+  socket.on("updateBoard", (newBoard) => {
+    const gameId = Array.from(socket.rooms).filter(room => room !== socket.id)[0];
+    const game = getGame(gameId);
+    if (game) {
+      game.board = newBoard;
+      socket
+        .to(gameId)
+        .emit("boardUpdate", newBoard);
+    }
+  });
+
+  socket.on("updateRack", ({ gameId, playerId, rack }) => {
+    console.log("Updating rack:", playerId, rack);
+    console.log("Game ID:", gameId);
+    const game = getGame(gameId);
+    if (game) {
+      console.log("Game found in updateRack");
+
+      // Find the player using the actual playerId, not the currentPlayer index
+      const playerIndex = game.players.findIndex((p) => p.playerId === playerId);
+
+      console.log("Player index in updateRack:", playerIndex);
+      if (playerIndex !== -1) {
+        console.log("Updating rack for player:", playerId);
+        game.players[playerIndex].rack = rack;
+        console.log("Updated rack:", game.players[playerIndex].rack);
+        socket
+          .to(gameId)
+          .emit("rackUpdate", { playerId, rack });
+        console.log("Emitted rack update");
+      } else {
+        console.error("Error: Could not find player to update rack:", playerId);
+      }
+    } else {
+      console.error("Error: Could not find game to update rack");
+    }
+  });
+
+  socket.on("playWord", (data) => {
+    console.log("Playing word");
+    const { gameId, board, players, currentPlayer, bag } = data;
+
+    const game = getGame(gameId);
+    if (game) {
+      // Find the player index based on currentPlayer
+      const playerIndex = currentPlayer;
+
+      // Update the board and bag in the game
+      game.board = board;
+      game.bag = bag;
+
+      // Update the current player's score
+      if (players && players[playerIndex]) {
+        game.players[playerIndex].score = players[playerIndex].score;
+      } else {
+        console.error("Error: Invalid player data received for playWord");
+        return;
+      }
+
+      // Switch to the next player
+      game.currentPlayer = (currentPlayer + 1) % 2;
+
+      // Update the game state
+      updateGame(gameId, game);
+
+      // Emit the updated game state
+      console.log("Updated game");
+      io.to(gameId).emit("gameUpdate", game);
+    } else {
+      console.error("Error: Game not found for gameId:", gameId);
+    }
+  });
+
+  socket.on("exchangeTile", (data) => {
+    console.log("Exchanging tile:", data);
+    const { gameId, playerId, rack, tileToExchange, currentPlayer } = data;
+    const game = getGame(gameId);
+    if (game) {
+      game.bag.push(tileToExchange);
+      const newTiles = drawTiles(game.bag, 1);
+
+      // Update the player's rack directly using the index
+      const playerIndex = game.players.findIndex((p) => p.playerId === playerId);
+      if (playerIndex !== -1) {
+        game.players[playerIndex].rack = [...rack, ...newTiles];
+      } else {
+        console.error(
+          "Error: Could not find player to update rack during exchange:",
+          playerId
+        );
+      }
+
+      game.currentPlayer = currentPlayer;
+      updateGame(gameId, game);
+      io.to(gameId).emit("gameUpdate", game);
+    } else {
+      console.error("Error: Could not find game for tile exchange:", gameId);
+    }
+  });
+
+  socket.on("passTurn", (data) => {
+    console.log("Passing turn:", data);
+    const { gameId, currentPlayer } = data;
+    const game = getGame(gameId);
+    if (game) {
+      game.currentPlayer = currentPlayer;
+      updateGame(gameId, game);
+      io.to(gameId).emit("gameUpdate", game);
+    } else {
+      console.error("Error: Could not find game to pass turn:", gameId);
+    }
+  });
+
+  socket.on("shuffleRack", ({ gameId, playerId, rack }) => {
+    console.log("Shuffling rack:", playerId, gameId);
+    const game = getGame(gameId);
+    if (game) {
+      const playerIndex = game.players.findIndex((p) => p.playerId === playerId);
+      if (playerIndex !== -1) {
+        game.players[playerIndex].rack = rack;
+        socket.emit("rackUpdate", { playerId, rack });
+      } else {
+        console.error("Error: Could not find player to shuffle rack:", playerId);
+      }
+    } else {
+      console.error("Error: Could not find game to shuffle rack");
+    }
+  });
+
+  socket.on("removeGame", (gameId) => {
+    console.log("Removing game:", gameId);
+    const game = getGame(gameId);
+    if (game) {
+      console.log("Game removed:", gameId);
+      io.to(gameId).emit("gameOver", game);
+      removeGame(gameId);
+    }
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Client disconnected:", socket.id);
+    if (socket.playerId) {
+      removePlayerFromQueue(socket.playerId);
+    }
+  });
 });
 
 // Bind server to 0.0.0.0 to listen on all interfaces
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server listening on port ${PORT}`);
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server listening on port ${PORT}`);
 });

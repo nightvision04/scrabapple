@@ -1,7 +1,4 @@
-// --- File: gameLogic.js ---
-// Title: gameLogic
-// Content:
-import { isValidWord, calculateScore, drawTiles, createEmptyBoard, createTileBag } from './utils';
+import { isValidWord, calculateScore, drawTiles, createEmptyBoard, createTileBag, getCookie } from './utils';
 import { LETTER_VALUES } from './constants';
 import io from 'socket.io-client';
 
@@ -93,7 +90,7 @@ export const calculatePotentialScore = (board) => {
   return totalScore;
 };
 
-export const handlePlayWord = async (board, players, currentPlayer, bag, socket, setTurnEndScore, setShowStarEffects, setPlayEndTurnAudio, setCurrentPlayer, setSelectedTile, setPotentialScore, setBag, setBoard) => {
+export const handlePlayWord = async (gameId, board, players, currentPlayer, bag, socket, setTurnEndScore, setShowStarEffects, setPlayEndTurnAudio, setCurrentPlayer, setSelectedTile, setPotentialScore, setBag, setBoard) => {
   const playedTiles = [];
   for (let i = 0; i < 15; i++) {
       for (let j = 0; j < 15; j++) {
@@ -233,6 +230,7 @@ export const handlePlayWord = async (board, players, currentPlayer, bag, socket,
 
       // Update the game state on the server
       socket.emit('playWord', {
+        gameId: gameId,
           board: newBoard,
           players: updatedPlayers.map((player, index) =>
               index === currentPlayer
@@ -245,7 +243,7 @@ export const handlePlayWord = async (board, players, currentPlayer, bag, socket,
   }, 1500);
 };
 
-export const handleExchange = (selectedTile, players, currentPlayer, board, setBoard, setPlayers, setSelectedTile, setPotentialScore, setCurrentPlayer, socket) => {
+export const handleExchange = (gameId, selectedTile, players, currentPlayer, board, setBoard, setPlayers, setSelectedTile, setPotentialScore, setCurrentPlayer, socket) => {
   if (selectedTile && selectedTile.from.type === 'rack') {
     const tileToExchange = selectedTile.tile;
     const newRack = [...players[currentPlayer].rack];
@@ -286,6 +284,7 @@ export const handleExchange = (selectedTile, players, currentPlayer, board, setB
             rack: newRack
         });
         socket.emit('exchangeTile', {
+            gameId: gameId,
             playerId: currentPlayer,
             rack: newRack,
             tileToExchange: tileToExchange,
@@ -297,7 +296,7 @@ export const handleExchange = (selectedTile, players, currentPlayer, board, setB
 }
 };
 
-export const handlePass = (board, players, currentPlayer, setBoard, setPlayers, setSelectedTile, setPotentialScore, setCurrentPlayer, socket) => {
+export const handlePass = (gameId, board, players, currentPlayer, setBoard, setPlayers, setSelectedTile, setPotentialScore, setCurrentPlayer, socket) => {
   // 1. Remove unplayed tiles from the board and return them to the player's rack
   const newBoard = [...board];
   const newRack = [...players[currentPlayer].rack];
@@ -331,26 +330,28 @@ export const handlePass = (board, players, currentPlayer, setBoard, setPlayers, 
       rack: newRack
   });
   socket.emit('passTurn', {
+    gameId: gameId,
       currentPlayer: nextPlayer
   });
 };
 
-export const handleShuffle = (players, currentPlayer, setPlayers, socket) => {
-  const currentRack = [...players[currentPlayer].rack];
-  for (let i = currentRack.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [currentRack[i], currentRack[j]] = [currentRack[j], currentRack[i]];
-  }
-
-  const updatedPlayers = [...players];
-  updatedPlayers[currentPlayer] = { ...players[currentPlayer], rack: currentRack };
-  setPlayers(updatedPlayers);
-
-  socket.emit('shuffleRack', {
-      playerId: currentPlayer,
-      rack: currentRack
-  });
-};
+export const handleShuffle = (gameId, players, currentPlayer, setPlayers, socket) => {
+    const currentRack = [...players.find(p => p.playerId === currentPlayer).rack];
+    for (let i = currentRack.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [currentRack[i], currentRack[j]] = [currentRack[j], currentRack[i]];
+    }
+  
+    const updatedPlayers = [...players];
+    updatedPlayers[currentPlayer] = { ...players.find(p => p.playerId === currentPlayer), rack: currentRack };
+    setPlayers(updatedPlayers);
+  
+    socket.emit('shuffleRack', {
+        gameId: gameId,
+        playerId: currentPlayer,
+        rack: currentRack
+    });
+  };
 
 export const handleSelectBlankTile = (letter, blankTilePosition, board, setBoard, updatePotentialScore, socket, setShowBlankTileModal, setBlankTilePosition) => {
   if (blankTilePosition) {
@@ -381,58 +382,70 @@ export const handleSelectBlankTile = (letter, blankTilePosition, board, setBoard
   }
 };
 
-export const handleNewGame = (setBoard, setPlayers, setCurrentPlayer, setBag, setSelectedTile, setGameStarted, setError, setPotentialScore, setShowBlankTileModal, setBlankTilePosition, setTurnEndScore, setShowStarEffects, setPlayEndTurnAudio, setGameOver, setSocket, SERVER_URL) => {
-  // Reset the game state
-  setBoard(createEmptyBoard());
-  setPlayers([
-      { score: 0, rack: [], socketId: null },
-      { score: 0, rack: [], socketId: null }
-  ]);
-  setCurrentPlayer(0);
-  setBag(createTileBag());
-  setSelectedTile(null);
-  setGameStarted(false); // Set gameStarted to false initially
-  setError('');
-  setPotentialScore(0);
-  setShowBlankTileModal(false);
-  setBlankTilePosition(null);
-  setTurnEndScore(0);
-  setShowStarEffects(false);
-  setPlayEndTurnAudio(false);
-  setGameOver(false);
-
-  // Reconnect to the server
-  const newSocket = io(SERVER_URL);
-  setSocket(newSocket);
-
-  newSocket.on('connect', () => {
-      newSocket.emit('joinGame');
-  });
-
-  // Set up other event listeners as before
-  newSocket.on('gameUpdate', (gameState) => {
-      setBoard(gameState.board);
-      setPlayers(gameState.players);
-      setCurrentPlayer(gameState.currentPlayer);
-      setBag(gameState.bag);
-      setGameStarted(gameState.gameStarted);
-  });
-
-  newSocket.on('errorMessage', (message) => {
-      setError(message);
-  });
-
-  newSocket.on('boardUpdate', (newBoard) => {
-      setBoard(newBoard);
-  });
-
-  newSocket.on('rackUpdate', ({ playerId, rack }) => {
-      setPlayers(prevPlayers => {
-          const newPlayers = [...prevPlayers];
-          newPlayers[playerId] = { ...newPlayers[playerId], rack };
-          return newPlayers;
-      });
-  });
-
-  return () => newSocket.close();
-};
+export const handleNewGame = (gameId, setBoard, setPlayers, setCurrentPlayer, setBag, setSelectedTile, setGameStarted, setError, setPotentialScore, setShowBlankTileModal, setBlankTilePosition, setTurnEndScore, setShowStarEffects, setPlayEndTurnAudio, setGameOver, setSocket, SERVER_URL) => {
+    // Get the current socket instance from the state
+    const currentSocket = setSocket;
+  
+    // Emit a signal to the server to remove the current game
+    if (gameId && currentSocket) {
+        currentSocket.emit('removeGame', gameId);
+    }
+  
+    // Reset the game state
+    setBoard(createEmptyBoard());
+    setPlayers([
+        { score: 0, rack: [], socketId: null },
+        { score: 0, rack: [], socketId: null }
+    ]);
+    setCurrentPlayer(0);
+    setBag(createTileBag());
+    setSelectedTile(null);
+    setGameStarted(false); // Set gameStarted to false initially
+    setError('');
+    setPotentialScore(0);
+    setShowBlankTileModal(false);
+    setBlankTilePosition(null);
+    setTurnEndScore(0);
+    setShowStarEffects(false);
+    setPlayEndTurnAudio(false);
+    setGameOver(false);
+  
+    // Reconnect to the server
+    const newSocket = io(SERVER_URL);
+    setSocket(newSocket);
+  
+    const playerId = getCookie('player-id');
+  
+    newSocket.on('connect', () => {
+        if (playerId) {
+            newSocket.emit('joinGame', playerId);
+        }
+    });
+  
+    // Set up other event listeners as before
+    newSocket.on('gameUpdate', (gameState) => {
+        setBoard(gameState.board);
+        setPlayers(gameState.players);
+        setCurrentPlayer(gameState.currentPlayer);
+        setBag(gameState.bag);
+        setGameStarted(gameState.gameStarted);
+    });
+  
+    newSocket.on('errorMessage', (message) => {
+        setError(message);
+    });
+  
+    newSocket.on('boardUpdate', (newBoard) => {
+        setBoard(newBoard);
+    });
+  
+    newSocket.on('rackUpdate', ({ playerId, rack }) => {
+        setPlayers(prevPlayers => {
+            const newPlayers = [...prevPlayers];
+            newPlayers[playerId] = { ...newPlayers[playerId], rack };
+            return newPlayers;
+        });
+    });
+  
+    return () => newSocket.close();
+  };

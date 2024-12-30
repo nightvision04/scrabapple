@@ -8,9 +8,9 @@ function Rack({ rack, onTileClick, selectedTile }) {
     <Droppable droppableId="rack" direction="horizontal">
       {(provided) => (
         <div ref={provided.innerRef} {...provided.droppableProps} role="list" className="rack">
-          {rack.map((tile, index) => {
+          {rack && rack.map((tile, index) => {
             const draggableId = `tile-${index}`;
-        
+
             return (
               <Tile
                 key={index}

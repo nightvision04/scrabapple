@@ -1,6 +1,3 @@
-// --- File: App.js ---
-// Title: App
-// Content:
 import React, { useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import { DragDropContext, Droppable } from 'react-beautiful-dnd';
@@ -11,8 +8,8 @@ import Rack from './components/Rack/Rack';
 import Scoreboard from './components/Scoreboard/Scoreboard';
 import GameControls from './components/GameControls/GameControls';
 import Tile from './components/Tile/Tile';
-import TilesLeft from './components/TilesLeft/TilesLeft'; // Import TilesLeft component
-import { createEmptyBoard, createTileBag } from './utils';
+import TilesLeft from './components/TilesLeft/TilesLeft';
+import { createEmptyBoard, setCookie, getCookie } from './utils';
 import { calculatePotentialScore, handlePlayWord, handleExchange, handlePass, handleShuffle, handleSelectBlankTile, handleNewGame } from './gameLogic';
 import { onDragEnd } from './dndHandlers';
 import { useAudioPlayers, playAudio } from './audioUtils';
@@ -33,11 +30,8 @@ function isTouchDevice() {
 
 function App() {
     const [socket, setSocket] = useState(null);
-    const [board, setBoard] = useState([]);
-    const [players, setPlayers] = useState([
-        { score: 0, rack: [], socketId: null },
-        { score: 0, rack: [], socketId: null }
-    ]);
+    const [board, setBoard] = useState(createEmptyBoard());
+    const [players, setPlayers] = useState([]);
     const [currentPlayer, setCurrentPlayer] = useState(0);
     const [bag, setBag] = useState([]);
     const [selectedTile, setSelectedTile] = useState(null);
@@ -50,23 +44,54 @@ function App() {
     const [showStarEffects, setShowStarEffects] = useState(false);
     const [playEndTurnAudio, setPlayEndTurnAudio] = useState(false);
     const [gameOver, setGameOver] = useState(false);
+    const [playerId, setPlayerId] = useState(null);
+    const [gameId, setGameId] = useState(null);
 
     const { tapSelectAudio, tapPlaceAudio, endTurnAudio, endGameAudio } = useAudioPlayers();
 
     useEffect(() => {
+        const playerCookie = getCookie('player-id');
+        let playerIdToUse;
+
+        if (playerCookie) {
+            setPlayerId(playerCookie);
+            playerIdToUse = playerCookie;
+        } else {
+            const newPlayerId = Math.random().toString(36).substr(2, 9);
+            setCookie('player-id', newPlayerId, 365);
+            setPlayerId(newPlayerId);
+            playerIdToUse = newPlayerId;
+        }
+
         const newSocket = io(SERVER_URL);
         setSocket(newSocket);
 
         newSocket.on('connect', () => {
-            newSocket.emit('joinGame');
+            newSocket.emit('joinGame', playerIdToUse);
         });
 
         newSocket.on('gameUpdate', (gameState) => {
+            console.log("Received gameUpdate:", gameState);
+            console.log("Received gameUpdate board:", gameState.board);
+
+            // Ensure players is always an array and has the correct structure
+            const updatedPlayers = gameState.players
+                ? Array.isArray(gameState.players)
+                    ? gameState.players
+                    : Object.values(gameState.players).map((player, index) => ({
+                        playerId: Object.keys(gameState.players)[index],
+                        ...player
+                    }))
+                : [];
+
             setBoard(gameState.board);
-            setPlayers(gameState.players);
+            setPlayers(updatedPlayers);
+            console.log("Updated players array:", updatedPlayers)
             setCurrentPlayer(gameState.currentPlayer);
             setBag(gameState.bag);
             setGameStarted(gameState.gameStarted);
+            console.log("Game started:", gameState.gameStarted);
+            setGameId(gameState.gameId);
         });
 
         newSocket.on('errorMessage', (message) => {
@@ -79,10 +104,19 @@ function App() {
 
         newSocket.on('rackUpdate', ({ playerId, rack }) => {
             setPlayers(prevPlayers => {
-                const newPlayers = [...prevPlayers];
-                newPlayers[playerId] = { ...newPlayers[playerId], rack };
-                return newPlayers;
+                const playerIndex = prevPlayers.findIndex(p => p.playerId === playerId);
+                if (playerIndex !== -1) {
+                    const updatedPlayers = [...prevPlayers];
+                    updatedPlayers[playerIndex] = { ...updatedPlayers[playerIndex], rack };
+                    return updatedPlayers;
+                }
+                return prevPlayers;
             });
+        });
+
+        newSocket.on('gameOver', (gameState) => {
+            setGameOver(true);
+            setGameId(null);
         });
 
         return () => newSocket.close();
@@ -96,7 +130,7 @@ function App() {
     }, [playEndTurnAudio, endTurnAudio]);
 
     useEffect(() => {
-        if (gameStarted && bag.length === 0 && (players[0].rack.length === 0 || players[1].rack.length === 0)) {
+        if (gameStarted && bag.length === 0 && players.length > 0 && (players[0].rack.length === 0 || players[1].rack.length === 0)) {
             setGameOver(true);
         }
     }, [gameStarted, bag, players]);
@@ -128,14 +162,15 @@ function App() {
                 setBoard(newBoard);
 
                 const updatedPlayers = [...players];
-                updatedPlayers[currentPlayer].rack.push('_');
+                updatedPlayers.find(p => p.playerId === playerId).rack.push('_');
                 setPlayers(updatedPlayers);
                 setSelectedTile(null);
 
                 socket.emit('updateBoard', newBoard);
                 socket.emit('updateRack', {
-                    playerId: currentPlayer,
-                    rack: updatedPlayers[currentPlayer].rack
+                    gameId: gameId,
+                    playerId: playerId,
+                    rack: updatedPlayers.find(p => p.playerId === playerId).rack
                 });
 
             } else if (!existingTile.original) {
@@ -145,14 +180,15 @@ function App() {
                 setBoard(newBoard);
 
                 const updatedPlayers = [...players];
-                updatedPlayers[currentPlayer].rack.push(newTile.tile);
+                updatedPlayers.find(p => p.playerId === playerId).rack.push(newTile.tile);
                 setPlayers(updatedPlayers);
                 setSelectedTile(null);
 
                 socket.emit('updateBoard', newBoard);
                 socket.emit('updateRack', {
-                    playerId: currentPlayer,
-                    rack: updatedPlayers[currentPlayer].rack
+                    gameId: gameId,
+                    playerId: playerId,
+                    rack: updatedPlayers.find(p => p.playerId === playerId).rack
                 });
             }
         } else if (selectedTile) {
@@ -169,12 +205,13 @@ function App() {
                 const updatedPlayers = [...players];
                 const rackIndex = selectedTile.from.index;
                 if (selectedTile.from.type === 'rack') {
-                    updatedPlayers[currentPlayer].rack.splice(rackIndex, 1);
+                    updatedPlayers.find(p => p.playerId === playerId).rack.splice(rackIndex, 1);
                     setPlayers(updatedPlayers);
 
                     socket.emit('updateRack', {
-                        playerId: currentPlayer,
-                        rack: updatedPlayers[currentPlayer].rack
+                        gameId: gameId,
+                        playerId: playerId,
+                        rack: updatedPlayers.find(p => p.playerId === playerId).rack
                     });
                 }
 
@@ -191,7 +228,29 @@ function App() {
         setPotentialScore(score);
     };
 
-    const isCurrentPlayerTurn = socket && players[currentPlayer].socketId === socket.id;
+    const isCurrentPlayerTurn = () => {
+        if (!gameStarted || !socket || players.length === 0) {
+            return false;
+        }
+    
+        const currentPlayerObj = players.find(p => p.playerId === playerId);
+        if (!currentPlayerObj) {
+            return false;
+        }
+    
+        // Check if the current player's socketId matches the connected socket's id
+        return currentPlayerObj.socketId === socket.id;
+    };
+
+    console.log("isCurrentPlayerTurn:", isCurrentPlayerTurn);
+    console.log("gameStarted:", gameStarted);
+    console.log("socket:", socket);
+    console.log("players:", players);
+    console.log("currentPlayer:", currentPlayer);
+    if (players.length > 0 && players[currentPlayer]) {
+        console.log("players[currentPlayer].socketId:", players[currentPlayer].socketId);
+    }
+    console.log("socket.id:", socket ? socket.id : null);
 
     const backendOptions = {
         enableMouseEvents: true,
@@ -202,15 +261,15 @@ function App() {
     return (
         <div className="app m-0 bg-amber-50">
             <img src={Logo} alt="Scrabble Logo" className="logo pt-2 pb-0 w-[30vw]" />
-            {gameOver && gameStarted && <EndScreen players={players} onNewGame={() => handleNewGame(setBoard, setPlayers, setCurrentPlayer, setBag, setSelectedTile, setGameStarted, setError, setPotentialScore, setShowBlankTileModal, setBlankTilePosition, setTurnEndScore, setShowStarEffects, setPlayEndTurnAudio, setGameOver, setSocket, SERVER_URL)} />}
+            {gameOver && gameStarted && <EndScreen players={players} onNewGame={() => handleNewGame(gameId, setBoard, setPlayers, setCurrentPlayer, setBag, setSelectedTile, setGameStarted, setError, setPotentialScore, setShowBlankTileModal, setBlankTilePosition, setTurnEndScore, setShowStarEffects, setPlayEndTurnAudio, setGameOver, socket, SERVER_URL)} />}
             {/* {error && <div className="error">{error}</div>} */}
             {!gameStarted && <Waiting />}
             {!gameOver && gameStarted && (
                 <>
-                    <div className={isCurrentPlayerTurn ? "font-bold text-sm my-2" : "text-sm my-2"}>
-                        {isCurrentPlayerTurn ? "Your Turn" : "Waiting for Opponent"}
+                    <div className={isCurrentPlayerTurn() ? "font-bold text-sm my-2" : "text-sm my-2"}>
+                        {isCurrentPlayerTurn() ? "Your Turn" : "Waiting for Opponent"}
                     </div>
-                    <YourTurnEffect isCurrentPlayerTurn={isCurrentPlayerTurn} />
+                    <YourTurnEffect isCurrentPlayerTurn={isCurrentPlayerTurn()} />
 
                     <StarEffects isComplete={showStarEffects} setIsComplete={setShowStarEffects}/>
                     <Scoreboard players={players} currentPlayer={currentPlayer} />
@@ -220,7 +279,7 @@ function App() {
                         {/* Use the TilesLeft component here */}
                         <TilesLeft board={board} players={players} gameStarted={gameStarted} />
                     </div>
-                    <DragDropContext onDragEnd={(result) => onDragEnd(result, board, players, currentPlayer, setBoard, setPlayers, setShowBlankTileModal, setBlankTilePosition, socket, updatePotentialScore, setSelectedTile)} backend={backend} options={backendOptions}>
+                    <DragDropContext onDragEnd={(result) => onDragEnd(result, board, players, currentPlayer, setBoard, setPlayers, setShowBlankTileModal, setBlankTilePosition, socket, updatePotentialScore, setSelectedTile, gameId, playerId)} backend={backend} options={backendOptions}>
                         <Droppable droppableId="board">
                             {(provided) => (
                                 <Board
@@ -228,7 +287,7 @@ function App() {
                                     {...provided.droppableProps}
                                     board={board}
                                     onTileClick={handleBoardTileClick}
-                                    isCurrentPlayerTurn={isCurrentPlayerTurn}
+                                    isCurrentPlayerTurn={isCurrentPlayerTurn()}
                                     currentPlayer={currentPlayer}
                                 >
                                     {provided.placeholder}
@@ -240,11 +299,15 @@ function App() {
                                 <Rack
                                     innerRef={provided.innerRef}
                                     {...provided.droppableProps}
-                                    rack={isCurrentPlayerTurn ? players[currentPlayer].rack : players[(currentPlayer + 1) % 2].rack}
+                                    rack={
+                                        players.length > 0
+                                            ? players.find(p => p.playerId === playerId)?.rack
+                                            : []
+                                    }
                                     onTileClick={handleRackTileClick}
                                     selectedTile={selectedTile}
                                 >
-                                    {isCurrentPlayerTurn && players[currentPlayer].rack.map((tile, index) => (
+                                    {players.some(p => p.playerId === playerId) && players.find(p => p.playerId === playerId)?.rack.map((tile, index) => (
                                         <Tile
                                             key={index}
                                             draggableId={`tile-${index}`}
@@ -259,11 +322,11 @@ function App() {
                             )}
                         </Droppable>
                         <GameControls
-                            onPlay={() => handlePlayWord(board, players, currentPlayer, bag, socket, setTurnEndScore, setShowStarEffects, setPlayEndTurnAudio, setCurrentPlayer, setSelectedTile, setPotentialScore, setBag, setBoard)}
-                            onExchange={() => handleExchange(selectedTile, players, currentPlayer, board, setBoard, setPlayers, setSelectedTile, setPotentialScore, setCurrentPlayer, socket)}
-                            onPass={() => handlePass(board, players, currentPlayer, setBoard, setPlayers, setSelectedTile, setPotentialScore, setCurrentPlayer, socket)}
-                            onShuffle={() => handleShuffle(players, currentPlayer, setPlayers, socket)}
-                            disabled={!isCurrentPlayerTurn}
+                            onPlay={() => handlePlayWord(gameId, board, players, currentPlayer, bag, socket, setTurnEndScore, setShowStarEffects, setPlayEndTurnAudio, setCurrentPlayer, setSelectedTile, setPotentialScore, setBag, setBoard)}
+                            onExchange={() => handleExchange(gameId, selectedTile, players, currentPlayer, board, setBoard, setPlayers, setSelectedTile, setPotentialScore, setCurrentPlayer, socket)}
+                            onPass={() => handlePass(gameId, board, players, currentPlayer, setBoard, setPlayers, setSelectedTile, setPotentialScore, setCurrentPlayer, socket)}
+                            onShuffle={() => handleShuffle(gameId, players, currentPlayer, setPlayers, socket)}
+                            disabled={!isCurrentPlayerTurn()}
                         />
                     </DragDropContext>
                     {showBlankTileModal && (
