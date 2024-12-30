@@ -91,57 +91,58 @@ export const calculatePotentialScore = (board) => {
 };
 
 export const handleExchange = (gameId, selectedTile, players, currentPlayer, board, setBoard, setPlayers, setSelectedTile, setPotentialScore, setCurrentPlayer, socket) => {
-  if (selectedTile && selectedTile.from.type === 'rack') {
-    const tileToExchange = selectedTile.tile;
-    const newRack = [...players[currentPlayer].rack];
-    const tileIndex = newRack.indexOf(tileToExchange);
-
-    if (tileIndex > -1) {
-        // Remove the selected tile from the rack
-        newRack.splice(tileIndex, 1);
-
-        // Clear any unplayed tiles from the board and add them back to the player's rack
-        const newBoard = [...board];
-        for (let i = 0; i < 15; i++) {
-            for (let j = 0; j < 15; j++) {
-                if (newBoard[i][j].tile && !newBoard[i][j].original) {
-                    newRack.push(newBoard[i][j].tile);
-                    newBoard[i][j] = { ...newBoard[i][j], tile: null };
-                }
-            }
-        }
-
-        const updatedPlayers = [...players];
-        updatedPlayers[currentPlayer] = { ...players[currentPlayer], rack: newRack };
-
-        // Update the state for the current player
-        setBoard(newBoard);
-        setPlayers(updatedPlayers);
-        setSelectedTile(null);
-        setPotentialScore(0);
-
-        // Switch to the next player
-        const nextPlayer = (currentPlayer + 1) % 2;
-        setCurrentPlayer(nextPlayer);
-
-        // Emit the updated board, rack, and exchange to the server
-        socket.emit('updateBoard', newBoard);
-        socket.emit('updateRack', {
-            playerId: currentPlayer,
+    if (selectedTile && selectedTile.from.type === 'rack') {
+      const tileToExchange = selectedTile.tile;
+      const newRack = [...players[currentPlayer].rack];
+      const tileIndex = newRack.indexOf(tileToExchange);
+  
+      if (tileIndex > -1) {
+          // Remove the selected tile from the rack
+          newRack.splice(tileIndex, 1);
+  
+          // Clear any unplayed tiles from the board and add them back to the player's rack
+          const newBoard = [...board];
+          for (let i = 0; i < 15; i++) {
+              for (let j = 0; j < 15; j++) {
+                  if (newBoard[i][j].tile && !newBoard[i][j].original) {
+                      newRack.push(newBoard[i][j].tile);
+                      newBoard[i][j] = { ...newBoard[i][j], tile: null };
+                  }
+              }
+          }
+  
+          const updatedPlayers = [...players];
+          updatedPlayers[currentPlayer] = { ...players[currentPlayer], rack: newRack };
+  
+          // Update the state for the current player
+          setBoard(newBoard);
+          setPlayers(updatedPlayers);
+          setSelectedTile(null);
+          setPotentialScore(0);
+  
+          // Switch to the next player
+          const nextPlayer = (currentPlayer + 1) % 2;
+        //   setCurrentPlayer(nextPlayer);
+  
+          // Emit the updated board, rack, and exchange to the server
+          socket.emit('updateBoard', newBoard);
+          socket.emit('updateRack', {
+            gameId: gameId,
+            playerId: updatedPlayers[currentPlayer].playerId,
             rack: newRack
         });
-        socket.emit('exchangeTile', {
-            gameId: gameId,
-            playerId: currentPlayer,
-            rack: newRack,
-            tileToExchange: tileToExchange,
-            currentPlayer: nextPlayer
-        });
-    }
-} else {
-    alert("Please select a tile from your rack to exchange.");
-}
-};
+          socket.emit('exchangeTile', {
+              gameId: gameId,
+              playerId: updatedPlayers[currentPlayer].playerId,
+              rack: newRack,
+              tileToExchange: tileToExchange,
+              currentPlayer: currentPlayer
+          });
+      }
+  } else {
+      alert("Please select a tile from your rack to exchange.");
+  }
+  };
 
 export const handlePass = (gameId, board, players, currentPlayer, setBoard, setPlayers, setSelectedTile, setPotentialScore, setCurrentPlayer, socket) => {
   // 1. Remove unplayed tiles from the board and return them to the player's rack

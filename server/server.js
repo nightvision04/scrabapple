@@ -13,6 +13,7 @@ const {
   matchPlayers,
   updateGame,
 } = require("./gameManager");
+const { drawTiles } = require("./server-utils");
 
 const app = express();
 const server = http.createServer(app);

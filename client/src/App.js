@@ -514,7 +514,7 @@ function App() {
         });
         socket.emit('passTurn', {
             gameId: gameId,
-            currentPlayer: currentPlayer
+            currentPlayer: currentPlayer // Send the current player (before the pass)
         });
     };
     
