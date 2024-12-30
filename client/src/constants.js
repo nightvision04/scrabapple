@@ -5,6 +5,7 @@ export const LETTER_VALUES = {
     'Y': 4, 'Z': 10, '_': 0,
 };
 
+
 export const BOARD_BONUSES = {
     '7,7': 'dw', // Center square
     '0,0': 'tw', '0,7': 'tw', '0,14': 'tw',

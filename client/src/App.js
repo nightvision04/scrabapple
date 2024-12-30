@@ -10,17 +10,17 @@ import Scoreboard from './components/Scoreboard/Scoreboard';
 import GameControls from './components/GameControls/GameControls';
 import Tile from './components/Tile/Tile';
 import TilesLeft from './components/TilesLeft/TilesLeft';
-import { createEmptyBoard, setCookie, getCookie, calculateScore, isValidWord, drawTiles } from './utils';
-import { calculatePotentialScore, handleExchange, handlePass, handleShuffle, handleSelectBlankTile, handleNewGame } from './gameLogic';
+import { createEmptyBoard, setCookie, getCookie } from './utils';
+import { calculatePotentialScore, handleExchange, handleSelectBlankTile, handleNewGame } from './gameLogic';
 import { onDragEnd } from './dndHandlers';
 import { useAudioPlayers, playAudio } from './audioUtils';
+import { calculateScore, isValidWord, drawTiles } from './utils';
 import './App.css';
 import Logo from './images/logo-black.png';
 import StarEffects from './components/Effects/StarEffects';
 import YourTurnEffect from './components/Effects/YourTurnEffect';
 import EndScreen from './components/EndScreen/EndScreen';
 import Waiting from './components/Waiting/Waiting';
-
 
 export const SERVER_URL = 'http://10.0.0.82:8080';
 
@@ -430,6 +430,96 @@ function App() {
         }, 1500);
     };
 
+    const handleShuffle = () => {
+        console.log("handleShuffle - Start");
+        if (!socket) {
+            console.error("handleShuffle - Socket is not connected");
+            return;
+        }
+        if (!gameId) {
+            console.error("handleShuffle - gameId is not defined");
+            return;
+        }
+        if (currentPlayer === undefined || currentPlayer === null) {
+            console.error("handleShuffle - currentPlayer is not defined");
+            return;
+        }
+        if (!players[currentPlayer]) {
+            console.error("handleShuffle - Could not find current player in players array");
+            return;
+        }
+
+        const currentRack = [...players[currentPlayer].rack];
+        console.log("handleShuffle - Current Rack Before Shuffle:", currentRack);
+
+        // Shuffle the rack
+        for (let i = currentRack.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [currentRack[i], currentRack[j]] = [currentRack[j], currentRack[i]];
+        }
+        console.log("handleShuffle - Current Rack After Shuffle:", currentRack);
+
+        // Update the local state
+        const updatedPlayers = [...players];
+        updatedPlayers[currentPlayer] = { ...players[currentPlayer], rack: currentRack };
+
+        setPlayers(updatedPlayers);
+        console.log("handleShuffle - Updated Players:", updatedPlayers);
+
+        // Emit the shuffleRack event to the server
+        socket.emit('shuffleRack', {
+            gameId: gameId,
+            playerId: players[currentPlayer].playerId, // Send the playerId
+            rack: currentRack
+        });
+
+        console.log("handleShuffle - Emitted shuffleRack to server");
+    };
+
+    const handlePass = (gameId, board, players, currentPlayer, setBoard, setPlayers, setSelectedTile, setPotentialScore) => {
+        // Ensure socket is available
+        if (!socket) {
+            console.error("Socket not initialized");
+            return;
+        }
+    
+        // 1. Remove unplayed tiles from the board and return them to the player's rack
+        const newBoard = [...board];
+        const newRack = [...players[currentPlayer].rack];
+    
+        for (let i = 0; i < 15; i++) {
+            for (let j = 0; j < 15; j++) {
+                if (newBoard[i][j].tile && !newBoard[i][j].original) {
+                    newRack.push(newBoard[i][j].tile);
+                    newBoard[i][j] = { ...newBoard[i][j], tile: null }; // Remove tile visually
+                }
+            }
+        }
+    
+        // 2. Update the state for the current player
+        const updatedPlayers = [...players];
+        updatedPlayers[currentPlayer].rack = newRack;
+    
+        setBoard(newBoard); // Update the board state to visually remove tiles
+        setPlayers(updatedPlayers);
+        setSelectedTile(null);
+        setPotentialScore(0);
+    
+        // Emit the necessary events to the server
+        socket.emit('updateBoard', newBoard);
+        socket.emit('updateRack', {
+            gameId: gameId,
+            playerId: updatedPlayers[currentPlayer].playerId,
+            rack: newRack
+        });
+        socket.emit('passTurn', {
+            gameId: gameId,
+            currentPlayer: currentPlayer
+        });
+    };
+    
+    
+
     return (
         <div className="app m-0 bg-amber-50">
             <img src={Logo} alt="Scrabble Logo" className="logo pt-2 pb-0 w-[30vw]" />
@@ -496,8 +586,8 @@ function App() {
                         <GameControls
                             onPlay={() => handlePlayWord(gameId, board, players, currentPlayer, bag, socket, setTurnEndScore, setShowStarEffects, setPlayEndTurnAudio, setCurrentPlayer, setSelectedTile, setPotentialScore, setBag, setBoard)}
                             onExchange={() => handleExchange(gameId, selectedTile, players, currentPlayer, board, setBoard, setPlayers, setSelectedTile, setPotentialScore, setCurrentPlayer, socket)}
-                            onPass={() => handlePass(gameId, board, players, currentPlayer, setBoard, setPlayers, setSelectedTile, setPotentialScore, setCurrentPlayer, socket)}
-                            onShuffle={() => handleShuffle(gameId, players, currentPlayer, setPlayers, socket)}
+                            onPass={() => handlePass(gameId, board, players, currentPlayer, setBoard, setPlayers, setSelectedTile, setPotentialScore, socket)}
+                            onShuffle={() => handleShuffle()}
                             disabled={!isCurrentPlayerTurn()}
                         />
                     </DragDropContext>

@@ -2,6 +2,7 @@ const fetch = require('node-fetch');
 SERVER_URL = 'http://10.0.0.82:8080';
 console.log("Loaded from env, SERVER_URL:", SERVER_URL);
 
+// This determines how many points eaach letter is worth
 const LETTER_VALUES = {
     'A': 1, 'B': 3, 'C': 3, 'D': 2, 'E': 1, 'F': 4, 'G': 2, 'H': 4,
     'I': 1, 'J': 8, 'K': 5, 'L': 1, 'M': 3, 'N': 1, 'O': 1, 'P': 3,
@@ -58,6 +59,7 @@ const createEmptyBoard = () => {
     return board;
 };
 
+// This counts how many of each letter exist in the bag
 const createTileBag = () => {
     const distribution = {
         'A': 9, 'B': 2, 'C': 2, 'D': 4, 'E': 12, 'F': 2, 'G': 3,

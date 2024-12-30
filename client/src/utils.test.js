@@ -1,5 +1,4 @@
 import { calculateScore, isValidWord, createTileBag, drawTiles } from './utils';
-import { BOARD_BONUSES, LETTER_VALUES } from './constants';
 
 // Mock fetch for isValidWord
 global.fetch = jest.fn(() =>
