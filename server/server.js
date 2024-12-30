@@ -177,52 +177,36 @@ io.on("connection", (socket) => {
     }
 });
 
-  socket.on("playWord", (data) => {
+socket.on("playWord", (data) => {
     console.log("Playing word");
-    const { gameId, board, players, currentPlayer, bag, newTiles } = data;
-    console.log("Received gameId:", gameId);
-    console.log("Received board:", board);
-    console.log("Received players:", players);
-    console.log("Received currentPlayer:", currentPlayer);
-    console.log("Received bag:", bag);
-    console.log("Received newTiles:", newTiles);
-
+    const { gameId, board, players, currentPlayer, bag, newTiles, lastPlayedTiles } = data;
+    
     const game = getGame(gameId);
     if (game) {
-        // Find the player index based on currentPlayer
-        const playerIndex = currentPlayer;
-
-        // Update the board and bag in the game
-        game.board = board;
-        game.bag = bag;
-
-        // Update the current player's score and rack
-        if (players && players[playerIndex]) {
-            game.players[playerIndex].score = players[playerIndex].score;
-            game.players[playerIndex].rack = players[playerIndex].rack;
-        } else {
-            console.error("Error: Invalid player data received for playWord");
-            return;
-        }
-
-        // Switch to the next player
+        // Store the current lastPlayedTiles as secondToLastPlayedTiles before updating
         const nextPlayer = (currentPlayer + 1) % 2;
-        game.currentPlayer = nextPlayer;
-
-        // Update the game state
-        updateGame(gameId, game);
-
-        // Emit the updated game state with newTiles for the current player
-        console.log("Updated game");
-        io.to(gameId).emit("gameUpdate", {
+        
+        // Only update lastPlayedTiles if there are new tiles being played
+        const updatedGame = {
             ...game,
-            newTiles: newTiles // Include new tiles in the game update
+            board,
+            bag,
+            players,
+            currentPlayer: nextPlayer,
+            lastPlayedTiles: lastPlayedTiles || [], // New tiles from current turn
+            secondToLastPlayedTiles: game.lastPlayedTiles || [] // Previous turn's tiles
+        };
+        
+        // Update the game state
+        updateGame(gameId, updatedGame);
+        
+        // Send a single update with all the necessary information
+        io.to(gameId).emit("gameUpdate", {
+            ...updatedGame,
+            newTiles
         });
-
-        // Explicitly emit a turn update event after the game state has been updated
-        io.to(gameId).emit("turnUpdate", game.currentPlayer);
-    } else {
-        console.error("Error: Game not found for gameId:", gameId);
+        
+        io.to(gameId).emit("turnUpdate", nextPlayer);
     }
 });
 
