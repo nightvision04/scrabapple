@@ -579,15 +579,7 @@ function App() {
                   socket
                 )
               }
-              onShuffle={() =>
-                handleShuffle(
-                  players,
-                  currentPlayer,
-                  socket,
-                  gameId,
-                  setPlayers
-                )
-              }
+              onShuffle={() => handleShuffle(players, playerId, socket, gameId, setPlayers)}
               disablePlay={!isCurrentPlayerTurn()}
               disableExchangePass={!isCurrentPlayerTurn()}
             />

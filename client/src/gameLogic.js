@@ -234,61 +234,58 @@ import {
     });
   };
 
-  export const handleShuffle = (players, currentPlayer, socket, gameId, setPlayers) => {
-      console.log("handleShuffle - Start");
-      if (!socket) {
+  export const handleShuffle = (players, playerId, socket, gameId, setPlayers) => {
+    console.log("handleShuffle - Start");
+    if (!socket) {
         console.error("handleShuffle - Socket is not connected");
         return;
-      }
-      if (!gameId) {
+    }
+    if (!gameId) {
         console.error("handleShuffle - gameId is not defined");
         return;
-      }
-      if (currentPlayer === undefined || currentPlayer === null) {
-          console.error("handleShuffle - currentPlayer is not defined");
-          return;
-      }
+    }
+    if (!playerId) {
+        console.error("handleShuffle - playerId is not defined");
+        return;
+    }
 
-      // Use the current player's ID to find the correct player in the players array
-      const currentPlayerId = players[currentPlayer]?.playerId;
-      if (!currentPlayerId) {
-          console.error("handleShuffle - Could not find current player ID in players array");
-          return;
-      }
+    // Find the player in the players array
+    const player = players.find(p => p.playerId === playerId);
+    if (!player) {
+        console.error("handleShuffle - Could not find player in players array");
+        return;
+    }
 
-      const playerIndex = players.findIndex(p => p.playerId === currentPlayerId);
-      if (playerIndex === -1) {
-          console.error("handleShuffle - Could not find current player in players array");
-          return;
-      }
+    const currentRack = [...player.rack];
+    console.log("handleShuffle - Current Rack Before Shuffle:", currentRack);
 
-      const currentRack = [...players[playerIndex].rack];
-      console.log("handleShuffle - Current Rack Before Shuffle:", currentRack);
+    // Shuffle the rack
+    for (let i = currentRack.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [currentRack[i], currentRack[j]] = [currentRack[j], currentRack[i]];
+    }
+    console.log("handleShuffle - Current Rack After Shuffle:", currentRack);
 
-      // Shuffle the rack
-      for (let i = currentRack.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [currentRack[i], currentRack[j]] = [currentRack[j], currentRack[i]];
-      }
-      console.log("handleShuffle - Current Rack After Shuffle:", currentRack);
+    // Update the local state
+    const updatedPlayers = players.map(p => 
+        p.playerId === playerId 
+            ? { ...p, rack: currentRack }
+            : p
+    );
 
-      // Update the local state
-      const updatedPlayers = [...players];
-      updatedPlayers[playerIndex] = { ...updatedPlayers[playerIndex], rack: currentRack };
+    // Update the players state
+    setPlayers(updatedPlayers);
+    console.log("handleShuffle - Updated Players:", updatedPlayers);
 
-      // Update the players state
-      setPlayers(updatedPlayers);
-      console.log("handleShuffle - Updated Players:", updatedPlayers);
+    // Emit the shuffleRack event to the server
+    socket.emit('shuffleRack', {
+        gameId: gameId,
+        playerId: playerId,
+        rack: currentRack
+    });
 
-      // Emit the shuffleRack event to the server
-      socket.emit('shuffleRack', {
-          gameId: gameId,
-          playerId: currentPlayerId,
-          rack: currentRack
-      });
-
-      console.log("handleShuffle - Emitted shuffleRack to server");
-  };
+    console.log("handleShuffle - Emitted shuffleRack to server");
+};
 
   export const handleSelectBlankTile = (
     letter,
