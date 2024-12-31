@@ -23,7 +23,7 @@ import { onDragEnd } from "./dndHandlers";
 import { useAudioPlayers, playAudio } from "./audioUtils";
 import { calculateScore, isValidWord, getAllRelevantWords } from "./utils";
 import "./App.css";
-import Logo from "./images/logo-black.png";
+import Logo from "./images/scrabapple-logo.svg";
 import StarEffects from "./components/Effects/StarEffects";
 import YourTurnEffect from "./components/Effects/YourTurnEffect";
 import EndScreen from "./components/EndScreen/EndScreen";

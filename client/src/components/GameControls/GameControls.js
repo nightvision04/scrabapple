@@ -2,6 +2,7 @@ import React from "react";
 import { FaExchangeAlt } from "react-icons/fa";
 import { FaAngleDoubleRight } from "react-icons/fa";
 import { FaSyncAlt } from "react-icons/fa";
+import { TbAppleFilled } from "react-icons/tb";
 
 const GameControls = ({
   onPlay,
