@@ -1,6 +1,6 @@
 const fetch = require('node-fetch');
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 8080; // we get this assigned from heroku
 const SERVER_URL = `http://localhost:${PORT}`;
 console.log("Loaded from env, SERVER_URL:", SERVER_URL);
 

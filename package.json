@@ -4,7 +4,7 @@
   "description": "2-player Scrabble game",
   "scripts": {
     "client": "cd client && yarn start",
-    "server": "node server/server.js",
+    "server": "node server/server-dev.js",
     "dev": "concurrently \"npm run server\" \"npm run client\""
   },
   "dependencies": {
