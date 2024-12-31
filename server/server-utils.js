@@ -61,18 +61,18 @@ const createEmptyBoard = () => {
 
 // This counts how many of each letter exist in the bag
 const createTileBag = () => {
-    const distribution = {
-        'A': 9, 'B': 2, 'C': 2, 'D': 4, 'E': 12, 'F': 2, 'G': 3,
-        'H': 2, 'I': 9, 'J': 1, 'K': 1, 'L': 4, 'M': 2, 'N': 6,
-        'O': 8, 'P': 2, 'Q': 1, 'R': 6, 'S': 4, 'T': 6, 'U': 4,
-        'V': 2, 'W': 2, 'X': 1, 'Y': 2, 'Z': 1, '_': 0
-    };
     // const distribution = {
-    //     'A': 18, 'B': 0, 'C': 0, 'D': 0, 'E': 0, 'F': 0, 'G': 0,
-    //     'H': 18, 'I': 0, 'J': 0, 'K': 0, 'L': 0, 'M': 0, 'N': 0,
-    //     'O': 0, 'P': 0, 'Q': 0, 'R': 0, 'S': 0, 'T': 0, 'U': 0,
-    //     'V': 0, 'W': 0, 'X': 0, 'Y': 0, 'Z': 0, '_': 0
+    //     'A': 9, 'B': 2, 'C': 2, 'D': 4, 'E': 12, 'F': 2, 'G': 3,
+    //     'H': 2, 'I': 9, 'J': 1, 'K': 1, 'L': 4, 'M': 2, 'N': 6,
+    //     'O': 8, 'P': 2, 'Q': 1, 'R': 6, 'S': 4, 'T': 6, 'U': 4,
+    //     'V': 2, 'W': 2, 'X': 1, 'Y': 2, 'Z': 1, '_': 0
     // };
+    const distribution = {
+        'A': 18, 'B': 0, 'C': 0, 'D': 0, 'E': 0, 'F': 0, 'G': 0,
+        'H': 18, 'I': 0, 'J': 0, 'K': 0, 'L': 0, 'M': 0, 'N': 0,
+        'O': 0, 'P': 0, 'Q': 0, 'R': 0, 'S': 0, 'T': 0, 'U': 0,
+        'V': 0, 'W': 0, 'X': 0, 'Y': 0, 'Z': 0, '_': 0
+    };
     const bag = [];
     for (const letter in distribution) {
         for (let i = 0; i < distribution[letter]; i++) {
@@ -93,7 +93,6 @@ const drawTiles = (bag, num) => {
     return drawn;
 };
 
-// Function to validate words using the server-side dictionary
 const isValidWord = async (word, board) => {
     if (word.length < 2) {
         return false;
@@ -109,89 +108,117 @@ const isValidWord = async (word, board) => {
     }
 };
 
-const calculateScore = (playedTiles, board) => {
-    if (playedTiles.length === 0) return 0;
+const calculateWordScore = (board, playedTiles, tiles) => {
+    if (!tiles || !playedTiles) {
+        return 0;
+    }
 
+    let wordScore = 0;
+    let wordMultiplier = 1;
     const newlyPlayedTiles = new Set(playedTiles.map(tile => `${tile.row},${tile.col}`));
 
-    const calculateWordScore = (tiles) => {
-        let wordScore = 0;
-        let wordMultiplier = 1;
-        let hasNewTile = false;
+    if (!tiles.some(t => newlyPlayedTiles.has(`${t.row},${t.col}`))) {
+        return 0;
+    }
 
-        for (const tile of tiles) {
-            const { row, col, tile: letter } = tile;
-            const letterValue = LETTER_VALUES[letter] || 0;
-            let tileScore = letterValue;
+    for (const tile of tiles) {
+        const { row, col, tile: letter } = tile;
+        const letterValue = LETTER_VALUES[letter] || 0;
+        let tileScore = letterValue;
 
-            if (newlyPlayedTiles.has(`${row},${col}`)) {
-                hasNewTile = true;
-                const bonus = board[row][col]?.bonus;
-                if (bonus === 'dl') tileScore *= 2;
-                else if (bonus === 'tl') tileScore *= 3;
-                else if (bonus === 'dw') wordMultiplier *= 2;
-                else if (bonus === 'tw') wordMultiplier *= 3;
-            }
-
-            wordScore += tileScore;
+        if (newlyPlayedTiles.has(`${row},${col}`)) {
+            const bonus = board[row][col]?.bonus;
+            if (bonus === 'dl') tileScore *= 2;
+            else if (bonus === 'tl') tileScore *= 3;
+            else if (bonus === 'dw') wordMultiplier *= 2;
+            else if (bonus === 'tw') wordMultiplier *= 3;
         }
 
-        return hasNewTile ? wordScore * wordMultiplier : 0;
-    };
+        wordScore += tileScore;
+    }
 
-    const getWordTiles = (startRow, startCol, isHorizontal) => {
-        let tiles = [];
-        let row = startRow;
-        let col = startCol;
+    return wordScore * wordMultiplier;
+};
 
-        // Move to the beginning of the word
-        while (row >= 0 && col >= 0 && board[row][col]?.tile) {
-            isHorizontal ? col-- : row--;
-        }
+const getWordTiles = (board, startRow, startCol, isHorizontal) => {
+    let tiles = [];
+    let row = startRow;
+    let col = startCol;
+
+    // Move to the beginning of the word
+    while (row >= 0 && col >= 0 && board[row][col]?.tile) {
+        isHorizontal ? col-- : row--;
+    }
+    isHorizontal ? col++ : row++;
+
+    // Collect all tiles in the word
+    while (row < 15 && col < 15 && board[row][col]?.tile) {
+        tiles.push({ row, col, tile: board[row][col].tile });
         isHorizontal ? col++ : row++;
+    }
 
-        // Collect all tiles in the word
-        while (row < 15 && col < 15 && board[row][col]?.tile) {
-            tiles.push({ row, col, tile: board[row][col].tile });
-            isHorizontal ? col++ : row++;
+    return tiles;
+};
+
+const getAllRelevantWords = (playedTiles, board) => {
+    const isHorizontal = determineWordDirection(playedTiles, board);
+    const words = [];
+    
+    const mainWordTiles = getWordTiles(board, playedTiles[0].row, playedTiles[0].col, isHorizontal);
+    words.push(mainWordTiles);
+
+    for (const tile of playedTiles) {
+        const perpendicularWordTiles = getWordTiles(board, tile.row, tile.col, !isHorizontal);
+        if (perpendicularWordTiles.length > 1) {
+            words.push(perpendicularWordTiles);
         }
+    }
 
-        return tiles;
-    };
+    return words;
+};
+
+
+const determineWordDirection = (playedTiles, board) => {
+    const tile = playedTiles[0];
+    // Check for adjacent tiles above/below
+    const hasVerticalNeighbors = (
+        (tile.row > 0 && board[tile.row - 1][tile.col]?.tile) ||
+        (tile.row < 14 && board[tile.row + 1][tile.col]?.tile)
+    );
+    // Check for adjacent tiles left/right
+    const hasHorizontalNeighbors = (
+        (tile.col > 0 && board[tile.row][tile.col - 1]?.tile) ||
+        (tile.col < 14 && board[tile.row][tile.col + 1]?.tile)
+    );
+    
+    if (playedTiles.length === 1) {
+        // For single tile plays, check existing connections
+        return hasVerticalNeighbors && !hasHorizontalNeighbors ? false : true;
+    } else {
+        // For multiple tiles, compare their positions
+        return playedTiles[0].row === playedTiles[1].row;
+    }
+};
+
+const calculateScore = (playedTiles, board) => {
+    if (!playedTiles || playedTiles.length === 0) return 0;
 
     let totalScore = 0;
+    const isHorizontal = determineWordDirection(playedTiles, board);
+    
+    const mainWordTiles = getWordTiles(board, playedTiles[0].row, playedTiles[0].col, isHorizontal);
+    totalScore += calculateWordScore(board, playedTiles, mainWordTiles);
 
-    // 1. Find the main word direction (horizontal or vertical)
-    const isHorizontal = playedTiles.length > 1 ? playedTiles[0].row === playedTiles[1].row : true;
-
-    // 2. Score the main word
-    const mainWordTiles = getWordTiles(playedTiles[0].row, playedTiles[0].col, isHorizontal);
-    totalScore += calculateWordScore(mainWordTiles);
-
-    // 3. Score perpendicular words formed by the played tiles
     for (const tile of playedTiles) {
-        const perpendicularWordTiles = getWordTiles(tile.row, tile.col, !isHorizontal);
-        // Only score if it's a valid word (length > 1) and contains a new tile
-        if (perpendicularWordTiles.length > 1 && perpendicularWordTiles.some(t => newlyPlayedTiles.has(`${t.row},${t.col}`))) {
-            totalScore += calculateWordScore(perpendicularWordTiles);
+        const perpendicularWordTiles = getWordTiles(board, tile.row, tile.col, !isHorizontal);
+        if (perpendicularWordTiles.length > 1) {
+            totalScore += calculateWordScore(board, playedTiles, perpendicularWordTiles);
         }
     }
 
     return totalScore;
-  };
-
-// Function to set a cookie
-const setCookie = (name, value, days) => {
-    const expires = new Date();
-    expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
-    document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
 };
 
-// Function to get a cookie
-const getCookie = (name) => {
-    const cookieValue = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
-    return cookieValue ? cookieValue.pop() : '';
-};
 
 module.exports = {
     createEmptyBoard,

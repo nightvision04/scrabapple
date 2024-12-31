@@ -78,7 +78,7 @@ const Board = ({
                     {!cell.tile && (
                       <>
                         {rowIndex === 7 && colIndex === 7 && (
-                          <span className=" text-pink-900 hover:bg-pink-200 text-[12px]">
+                          <span className=" text-pink-900 text-[12px]">
                             ★
                           </span>
                         )}
@@ -105,15 +105,15 @@ const Board = ({
 const getBonusClassName = (bonus) => {
   switch (bonus) {
     case "tw":
-      return "bg-[#D9BCFC] text-black hover:bg-rose-500";
+      return "bg-[#D9BCFC] text-black cursor-default";
     case "dw":
-      return "bg-[#FDC5E4] text-black-900 hover:bg-pink-200";
+      return "bg-[#FDC5E4] text-black-900 cursor-default";
     case "tl":
-      return "bg-[#C3E9F6] text-black-900 hover:bg-blue-400";
+      return "bg-[#C3E9F6] text-black-900 cursor-default";
     case "dl":
-      return "bg-[#D8FBEC] text-black-900 hover:bg-blue-100";
+      return "bg-[#D8FBEC] text-black-900 cursor-default";
     default:
-      return "bg-[#FEFAE4] hover:bg-amber-100";
+      return "bg-[#FEFAE4] cursor-default";
   }
 };
 

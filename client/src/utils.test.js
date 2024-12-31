@@ -230,6 +230,41 @@ describe('calculateScore', () => {
             expect(score).toBe(7);
         });
 
+        it('should calculate score correctly for player 2 playing H to connect with A after player 1 played AHA', () => {
+            // Initialize an empty board
+            const emptyBoard = Array(15).fill(null).map(() => Array(15).fill({ tile: null, bonus: null }));
+        
+            // Setup the board with Player 1's word "AHA"
+            const board = [...emptyBoard];
+            board[7][7] = { tile: 'A', bonus: null, original: true };
+            board[7][8] = { tile: 'H', bonus: null, original: true };
+            board[7][9] = { tile: 'A', bonus: null, original: true };
+        
+            // Player 2 plays "H" (connecting to create "HA" vertically)
+            const playedTiles = [
+                { row: 6, col: 7, tile: 'H' }  // H above the A in AHA, on triple letter
+            ];
+            board[6][7] = { tile: 'H', bonus: 'tl' }; // H on a triple letter bonus
+        
+            // Calculate the score
+            const score = calculateScore(playedTiles, board);
+        
+            // Expected score: (H=4 * 3 for triple letter) + A=1 = 13
+            expect(score).toBe(13);
+
+            // Add another A to the board
+            board[6][8] = { tile: 'A', bonus: null };
+            const playedTilesAgain = [
+                { row: 6, col: 8, tile: 'A' } // A to the right of the H, forming HA (horiz) annd AH (vert)
+            ];
+            const scoreAgain = calculateScore(playedTilesAgain, board);
+
+            //Expected score: H4 + A1 (word HA) + A1 + H4(word AH) = 4 + 1 + 1 + 4 = 10
+            expect(scoreAgain).toBe(10);
+
+        });
+    
+
     });
 
 describe('isValidWord', () => {
@@ -242,7 +277,7 @@ describe('isValidWord', () => {
 
         const valid = await isValidWord('HELLO');
         expect(valid).toBe(true);
-        expect(fetch).toHaveBeenCalledWith('http://localhost:8080/validate-word/hello');
+        expect(fetch).toHaveBeenCalledWith('http://10.0.0.82:8080/validate-word/hello');
     });
 
     it('returns false for an invalid word', async () => {
@@ -254,7 +289,7 @@ describe('isValidWord', () => {
 
         const valid = await isValidWord('XYZ');
         expect(valid).toBe(false);
-        expect(fetch).toHaveBeenCalledWith('http://localhost:8080/validate-word/xyz');
+        expect(fetch).toHaveBeenCalledWith('http://10.0.0.82:8080/validate-word/xyz');
     });
 
     it('returns false for a word less than 2 letters', async () => {
@@ -271,7 +306,7 @@ describe('isValidWord', () => {
 
         const valid = await isValidWord('TEST');
         expect(valid).toBe(false);
-        expect(fetch).toHaveBeenCalledWith('http://localhost:8080/validate-word/test');
+        expect(fetch).toHaveBeenCalledWith('http://10.0.0.82:8080/validate-word/test');
 
         console.error = originalConsoleError;
     });

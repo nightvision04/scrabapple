@@ -21,15 +21,13 @@ import {
 } from "./gameLogic";
 import { onDragEnd } from "./dndHandlers";
 import { useAudioPlayers, playAudio } from "./audioUtils";
-import { calculateScore, isValidWord, drawTiles, isStraightLine } from "./utils";
+import { calculateScore, isValidWord, getAllRelevantWords, SERVER_URL } from "./utils";
 import "./App.css";
 import Logo from "./images/logo-black.png";
 import StarEffects from "./components/Effects/StarEffects";
 import YourTurnEffect from "./components/Effects/YourTurnEffect";
 import EndScreen from "./components/EndScreen/EndScreen";
 import Waiting from "./components/Waiting/Waiting";
-
-export const SERVER_URL = "http://10.0.0.82:8080";
 
 function isTouchDevice() {
   return (
@@ -290,77 +288,40 @@ function App() {
     updatePotentialScore();
   };
 
-  // App.js
-const updatePotentialScore = async () => {
-  // Always calculate the potential score
-  let score = calculatePotentialScore(board);
+// In App.js
 
-  // Check if any tiles are played on the board
+const updatePotentialScore = async () => {
   const playedTiles = [];
   for (let i = 0; i < 15; i++) {
-    for (let j = 0; j < 15; j++) {
-      if (board[i][j]?.tile && !board[i][j]?.original) {
-        playedTiles.push({ row: i, col: j, tile: board[i][j].tile });
-      }
-    }
-  }
-
-  if (playedTiles.length > 0) {
-      let isValid = false;
-    // 1. Check if the played tiles are in a straight line
-    const isHorizontal =
-      playedTiles.length === 1 ||
-      playedTiles.every((tile) => tile.row === playedTiles[0].row);
-    const isVertical =
-      playedTiles.length === 1 ||
-      playedTiles.every((tile) => tile.col === playedTiles[0].col);
-
-    if (!isHorizontal && !isVertical) {
-      setPotentialScore(0); // Tiles not in a line, score should be 0
-      return;
-    }
-
-    // 2. Get the main word from the played tiles
-    const mainWordTiles = getWordTiles(
-      playedTiles[0].row,
-      playedTiles[0].col,
-      isHorizontal
-    );
-    const mainWord = mainWordTiles
-      .map((tile) => tile.tile)
-      .join("")
-      .toLowerCase();
-
-    // 3. Validate the main word
-    // If the main word has only one letter, check if it's connected to other tiles
-    if (mainWord.length === 1) {
-        isValid = isConnectedToExistingTile(playedTiles[0].row, playedTiles[0].col, board);
-    } else {
-      isValid = await isValidWord(mainWord, board);
-    }
-
-    // 4. Validate cross words (perpendicular words)
-    if (isValid) {
-      for (const tile of playedTiles) {
-        const crossWordTiles = getWordTiles(tile.row, tile.col, !isHorizontal);
-        if (crossWordTiles.length > 1) {
-          const crossWord = crossWordTiles
-            .map((t) => t.tile)
-            .join("")
-            .toLowerCase();
-          if (!(await isValidWord(crossWord, board))) {
-            isValid = false;
-            break; 
+      for (let j = 0; j < 15; j++) {
+          if (board[i][j]?.tile && !board[i][j]?.original) {
+              playedTiles.push({ row: i, col: j, tile: board[i][j].tile });
           }
-        }
       }
-    }
-    // Update the potential score only if the placement is valid
-    setPotentialScore(isValid ? score : 0);
-  } else {
-      // If no tiles are played, set the potential score to 0
-      setPotentialScore(0);
   }
+
+  if (playedTiles.length === 0) {
+      setPotentialScore(0);
+      return;
+  }
+
+  const words = getAllRelevantWords(playedTiles, board);
+  
+  for (const wordTiles of words) {
+      const word = wordTiles.map(tile => tile.tile).join("").toLowerCase();
+      if (word.length === 1) {
+          if (!isConnectedToExistingTile(wordTiles[0].row, wordTiles[0].col, board)) {
+              setPotentialScore(0);
+              return;
+          }
+      } else if (!(await isValidWord(word, board))) {
+          setPotentialScore(0);
+          return;
+      }
+  }
+
+  const score = calculateScore(playedTiles, board);
+  setPotentialScore(score);
 };
 
 // Helper function to check for connection to existing tiles, especially the first tile
@@ -452,7 +413,7 @@ const isConnectedToExistingTile = (row, col, board) => {
               setShowStarEffects,
               setPlayEndTurnAudio,
               setGameOver,
-              socket,
+              setSocket,
               SERVER_URL,
               setLastPlayedTiles,
               setSecondToLastPlayedTiles
