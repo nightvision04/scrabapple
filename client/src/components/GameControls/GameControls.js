@@ -16,8 +16,8 @@ const GameControls = ({
     <div className="flex flex-wrap gap-2 justify-center -mt-2 p-4">
       <button
         onClick={onPlay}
-        className={`px-4 py-2 bg-blue-600 text-white rounded-lg transition-colors active:bg-blue-500 ${
-          disablePlay ? "bg-blue-400 cursor-not-allowed" : "hover:bg-blue-700"
+        className={`px-4 py-2 bg-amber-900 text-white rounded-lg transition-colors active:amber-900 ${
+          disablePlay ? "bg-amber-400 cursor-not-allowed" : "hover:bg-amber-700"
         }`}
         disabled={disablePlay}
       >
