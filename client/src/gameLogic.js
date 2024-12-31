@@ -175,6 +175,11 @@ import {
           tileToExchange: tileToExchange,
           currentPlayer: currentPlayer,
         });
+        socket.emit("passTurn", {
+          gameId: gameId,
+          currentPlayer: currentPlayer,
+        });
+
       }
     } else {
       alert("Please select a tile from your rack to exchange.");
