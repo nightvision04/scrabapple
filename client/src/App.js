@@ -482,7 +482,7 @@ const isConnectedToExistingTile = (row, col, board) => {
       <img
         src={Logo}
         alt="Scrabble Logo"
-        className="logo pt-2 pb-0 max-w-[220px] sm:max-w-[220px]"
+        className="logo pt-2 pb-0 max-w-[145px] sm:max-w-[220px]"
       />
       {gameOver && gameStarted && (
         <EndScreen
