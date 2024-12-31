@@ -181,35 +181,77 @@ io.on("connection", (socket) => {
     });
   
     socket.on("playWord", (data) => {
-      console.log("Playing word");
-      const { gameId, board, players, currentPlayer, bag, newTiles, lastPlayedTiles } = data;
-      
-      const game = getGame(gameId);
-      if (game) {
-        const nextPlayer = (currentPlayer + 1) % 2;
-        
-        // Only update lastPlayedTiles if there are new tiles being played
-        const updatedGame = {
-          ...game,
-          board,
-          bag,
-          players,
-          currentPlayer: nextPlayer,
-          lastPlayedTiles: lastPlayedTiles || [], // New tiles from current turn
-          secondToLastPlayedTiles: game.lastPlayedTiles || [] // Previous turn's tiles
-        };
-        
-        // Update the game state
-        updateGame(gameId, updatedGame);
-        
-        // Send a single update with all the necessary information
-        io.to(gameId).emit("gameUpdate", {
-          ...updatedGame,
-          newTiles
-        });
-        
-        io.to(gameId).emit("turnUpdate", nextPlayer);
-      }
+        console.log("playWord - Received playWord event");
+        const { gameId, board, players, currentPlayer, bag, newTiles, lastPlayedTiles, secondToLastPlayedTiles } = data;
+    
+        const game = getGame(gameId);
+        if (game) {
+            const nextPlayer = (currentPlayer + 1) % 2;
+    
+            // Log the current player's rack before the update
+            console.log(
+                `[Game ${gameId}] Player ${game.players[currentPlayer].playerId}'s rack before playing:`,
+                game.players[currentPlayer].rack
+            );
+    
+            // Update the player's rack on the server-side
+            const playerIndex = currentPlayer;
+            if (playerIndex !== -1) {
+                // Remove played tiles
+                game.players[playerIndex].rack = game.players[playerIndex].rack.filter((tile) => {
+                    return !lastPlayedTiles.some((playedTile) => playedTile.tile === tile);
+                });
+    
+                // Add new tiles
+                game.players[playerIndex].rack.push(...newTiles);
+            } else {
+                console.error("Error: Could not find player to update rack:", game.players[currentPlayer].playerId);
+            }
+    
+            // Update the game state
+            const updatedGame = {
+                ...game,
+                board,
+                bag,
+                players: game.players,
+                currentPlayer: nextPlayer,
+                lastPlayedTiles: lastPlayedTiles || [],
+                secondToLastPlayedTiles: game.lastPlayedTiles || [],
+            };
+    
+            updateGame(gameId, updatedGame);
+    
+            // Log the new tiles drawn and the updated bag
+            console.log(
+                `[Game ${gameId}] New tiles drawn for player ${game.players[currentPlayer].playerId}:`,
+                newTiles
+            );
+            console.log(`[Game ${gameId}] Updated bag after drawing tiles:`, bag);
+    
+            // Log the current player's rack after the update
+            console.log(
+                `[Game ${gameId}] Player ${game.players[currentPlayer].playerId}'s rack after playing:`,
+                game.players[currentPlayer].rack
+            );
+    
+            // Send gameUpdate to the current player with newTiles information
+            io.to(game.players[currentPlayer].socketId).emit("gameUpdate", {
+                ...updatedGame,
+                newTiles,
+            });
+    
+            // Send gameUpdate to the other player *without* newTiles information
+            io.to(gameId).except(game.players[currentPlayer].socketId).emit("gameUpdate", {
+                ...updatedGame,
+            });
+    
+            io.to(gameId).emit("turnUpdate", nextPlayer);
+            console.log(
+                `[Game ${gameId}] Word played by player: ${game.players[currentPlayer].playerId}, next turn: ${game.players[nextPlayer].playerId}`
+            );
+        } else {
+            console.error("playWord - Error: Could not find game:", gameId);
+        }
     });
   
     socket.on("exchangeTile", (data) => {
