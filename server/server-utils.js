@@ -1,5 +1,5 @@
 const fetch = require('node-fetch');
-SERVER_URL = 'http://10.0.0.82:8080';
+SERVER_URL = 'http://localhost:8080';
 console.log("Loaded from env, SERVER_URL:", SERVER_URL);
 
 // This determines how many points eaach letter is worth
