@@ -37,6 +37,18 @@ function isTouchDevice() {
   );
 }
 
+
+export const getServerUrl = () => {
+  // In production, use the full URL from env var if available
+  if (process.env.REACT_APP_SERVER_URL) {
+      return process.env.REACT_APP_SERVER_URL;
+  }
+  
+  // In development, use the current origin
+  return window.location.origin;
+};
+
+
 function App() {
   const [socket, setSocket] = useState(null);
   const socketRef = useRef(null);
@@ -67,14 +79,15 @@ function App() {
         let playerIdToUse;
 
         const connectSocket = (playerIdToUse) => {
-            console.log(`NEW SOCKET ${process.env.REACT_APP_SERVER_URL}`);
-            const newSocket = io(process.env.REACT_APP_SERVER_URL);
-            socketRef.current = newSocket;
-            setSocket(newSocket);
-            newSocket.on("connect", () => {
+          const serverUrl = getServerUrl();
+          console.log(`NEW SOCKET ${serverUrl}`);
+          const newSocket = io(serverUrl);
+          socketRef.current = newSocket;
+          setSocket(newSocket);
+          newSocket.on("connect", () => {
               newSocket.emit("joinGame", playerIdToUse);
-            });
-        }
+          });
+      }
 
         const playerCookie = getCookie("player-id");
 
@@ -445,7 +458,7 @@ const isConnectedToExistingTile = (row, col, board) => {
     setCookie("player-id", newPlayerId, 365);
     setPlayerId(newPlayerId);
 
-    const newSocket = io(process.env.REACT_APP_SERVER_URL);
+    const newSocket = io(window.location.origin);
     newSocket.on("connect", () => {
         console.log("New socket connected, emitting joinGame for", newPlayerId);
         newSocket.emit("joinGame", newPlayerId);
