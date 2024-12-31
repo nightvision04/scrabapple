@@ -1,5 +1,5 @@
 // --- File: App.js ---
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import io from "socket.io-client";
 import { DragDropContext, Droppable } from "react-beautiful-dnd";
 import { TouchBackend } from "react-dnd-touch-backend";
@@ -39,6 +39,7 @@ function isTouchDevice() {
 
 function App() {
   const [socket, setSocket] = useState(null);
+  const socketRef = useRef(null);
   const [board, setBoard] = useState(createEmptyBoard());
   const [players, setPlayers] = useState([]);
   const [currentPlayer, setCurrentPlayer] = useState(0);
@@ -57,114 +58,128 @@ function App() {
   const [gameId, setGameId] = useState(null);
   const [lastPlayedTiles, setLastPlayedTiles] = useState([]);
   const [secondToLastPlayedTiles, setSecondToLastPlayedTiles] = useState([]);
+  const [waitingRetryId, setWaitingRetryId] = useState(null);
 
   const { tapSelectAudio, tapPlaceAudio, endTurnAudio, endGameAudio } =
     useAudioPlayers();
 
     useEffect(() => {
-        const playerCookie = getCookie("player-id");
         let playerIdToUse;
 
-        if (playerCookie) {
-          setPlayerId(playerCookie);
-          playerIdToUse = playerCookie;
-        } else {
-          const newPlayerId = Math.random().toString(36).substr(2, 9);
-          setCookie("player-id", newPlayerId, 365);
-          setPlayerId(newPlayerId);
-          playerIdToUse = newPlayerId;
+        const connectSocket = (playerIdToUse) => {
+            const newSocket = io(SERVER_URL);
+            socketRef.current = newSocket;
+            setSocket(newSocket);
+            newSocket.on("connect", () => {
+              newSocket.emit("joinGame", playerIdToUse);
+            });
         }
 
-        const newSocket = io(SERVER_URL);
-        setSocket(newSocket);
+        const playerCookie = getCookie("player-id");
 
-        newSocket.on("connect", () => {
-          newSocket.emit("joinGame", playerIdToUse);
-        });
+        if (playerCookie) {
+            playerIdToUse = playerCookie;
+            connectSocket(playerIdToUse);
+        } else {
+            const newPlayerId = Math.random().toString(36).substr(2, 9);
+            setCookie("player-id", newPlayerId, 365);
+            playerIdToUse = newPlayerId;
+            connectSocket(playerIdToUse);
+        }
 
-        newSocket.on("gameUpdate", (gameState) => {
-          console.log("Received gameUpdate:", gameState);
-          console.log("Received gameUpdate board:", gameState.board);
-          console.log("Received currentPlayer in gameUpdate:", gameState.currentPlayer);
+        setPlayerId(playerIdToUse);
 
-          // Ensure players is always an array and has the correct structure
-          const updatedPlayers = gameState.players
-            ? Array.isArray(gameState.players)
-              ? gameState.players
-              : Object.values(gameState.players).map((player, index) => ({
-                  playerId: Object.keys(gameState.players)[index],
-                  ...player,
-                }))
-            : [];
-
-          setBoard(gameState.board);
-          setPlayers(updatedPlayers);
-          console.log("Updated players array:", updatedPlayers);
-          setCurrentPlayer(gameState.currentPlayer);
-          setBag(gameState.bag);
-          setGameStarted(gameState.gameStarted);
-          console.log("Game started:", gameState.gameStarted);
-          setGameId(gameState.gameId);
-          setSecondToLastPlayedTiles(gameState.secondToLastPlayedTiles || []);
-          setLastPlayedTiles(gameState.lastPlayedTiles || []);
-
-          // Check if new tiles are drawn for the current player and it's their turn
-          if (
-            gameState.newTiles &&
-            gameState.currentPlayer ===
-              updatedPlayers.findIndex((p) => p.playerId === playerIdToUse)
-          ) {
-            console.log("New tiles from gameUpdate:", gameState.newTiles);
-            const playerIndex = updatedPlayers.findIndex(
-              (p) => p.playerId === playerIdToUse
-            );
-            if (playerIndex !== -1) {
-              updatedPlayers[playerIndex].rack.push(...gameState.newTiles);
-              setPlayers(updatedPlayers);
-            }
-          }
-        });
-
-        newSocket.on("errorMessage", (message) => {
-          setError(message);
-        });
-
-        newSocket.on("boardUpdate", (newBoard) => {
-          setBoard(newBoard);
-        });
-
-        newSocket.on("rackUpdate", ({ playerId, rack }) => {
-          setPlayers((prevPlayers) => {
-            const playerIndex = prevPlayers.findIndex(
-              (p) => p.playerId === playerId
-            );
-            if (playerIndex !== -1) {
-              const updatedPlayers = [...prevPlayers];
-              updatedPlayers[playerIndex] = {
-                ...updatedPlayers[playerIndex],
-                rack,
-              };
-              return updatedPlayers;
-            }
-            return prevPlayers;
-          });
-        });
-
-        newSocket.on("gameOver", (gameState) => {
-          setGameOver(true);
-          setGameId(null);
-        });
-
-        newSocket.on("gameReady", () => {
-          setGameStarted(true);
-        });
-
-        newSocket.on("turnUpdate", (currentPlayer) => {
-          setCurrentPlayer(currentPlayer);
-        });
-
-        return () => newSocket.close();
+        return () => socketRef.current.close();
       }, []);
+
+      useEffect(() => {
+        if (socket) {
+            socket.on("gameUpdate", (gameState) => {
+              console.log("Received gameUpdate:", gameState);
+              console.log("Received gameUpdate board:", gameState.board);
+              console.log("Received currentPlayer in gameUpdate:", gameState.currentPlayer);
+
+              if (waitingRetryId) {
+                clearTimeout(waitingRetryId);
+                setWaitingRetryId(null);
+            }
+              // Ensure players is always an array and has the correct structure
+              const updatedPlayers = gameState.players
+                ? Array.isArray(gameState.players)
+                  ? gameState.players
+                  : Object.values(gameState.players).map((player, index) => ({
+                      playerId: Object.keys(gameState.players)[index],
+                      ...player,
+                    }))
+                : [];
+
+              setBoard(gameState.board);
+              setPlayers(updatedPlayers);
+              console.log("Updated players array:", updatedPlayers);
+              setCurrentPlayer(gameState.currentPlayer);
+              setBag(gameState.bag);
+              setGameStarted(gameState.gameStarted);
+              console.log("Game started:", gameState.gameStarted);
+              setGameId(gameState.gameId);
+              setSecondToLastPlayedTiles(gameState.secondToLastPlayedTiles || []);
+              setLastPlayedTiles(gameState.lastPlayedTiles || []);
+
+              // Check if new tiles are drawn for the current player and it's their turn
+              if (
+                gameState.newTiles &&
+                gameState.currentPlayer ===
+                  updatedPlayers.findIndex((p) => p.playerId === playerId)
+              ) {
+                console.log("New tiles from gameUpdate:", gameState.newTiles);
+                const playerIndex = updatedPlayers.findIndex(
+                  (p) => p.playerId === playerId
+                );
+                if (playerIndex !== -1) {
+                  updatedPlayers[playerIndex].rack.push(...gameState.newTiles);
+                  setPlayers(updatedPlayers);
+                }
+              }
+            });
+
+            socket.on("errorMessage", (message) => {
+              setError(message);
+            });
+
+            socket.on("boardUpdate", (newBoard) => {
+              setBoard(newBoard);
+            });
+
+            socket.on("rackUpdate", ({ playerId, rack }) => {
+              setPlayers((prevPlayers) => {
+                const playerIndex = prevPlayers.findIndex(
+                  (p) => p.playerId === playerId
+                );
+                if (playerIndex !== -1) {
+                  const updatedPlayers = [...prevPlayers];
+                  updatedPlayers[playerIndex] = {
+                    ...updatedPlayers[playerIndex],
+                    rack,
+                  };
+                  return updatedPlayers;
+                }
+                return prevPlayers;
+              });
+            });
+
+            socket.on("gameOver", (gameState) => {
+              setGameOver(true);
+              setGameId(null);
+            });
+
+            socket.on("gameReady", () => {
+              setGameStarted(true);
+            });
+
+            socket.on("turnUpdate", (currentPlayer) => {
+              setCurrentPlayer(currentPlayer);
+            });
+        }
+      }, [socket, playerId]);
 
   useEffect(() => {
     if (playEndTurnAudio) {
@@ -225,8 +240,8 @@ function App() {
       setBoard(newBoard);
       setPlayers(updatedPlayers);
 
-      socket.emit("updateBoard", newBoard);
-      socket.emit("updateRack", {
+      socketRef.current.emit("updateBoard", newBoard);
+      socketRef.current.emit("updateRack", {
         gameId: gameId,
         playerId: playerId,
         rack: player.rack,
@@ -249,7 +264,7 @@ function App() {
             .rack.splice(rackIndex, 1);
           setPlayers(updatedPlayers);
 
-          socket.emit("updateRack", {
+          socketRef.current.emit("updateRack", {
             gameId: gameId,
             playerId: playerId,
             rack: updatedPlayers.find((p) => p.playerId === playerId).rack,
@@ -273,7 +288,7 @@ function App() {
             .rack.splice(rackIndex, 1);
           setPlayers(updatedPlayers);
 
-          socket.emit("updateRack", {
+          socketRef.current.emit("updateRack", {
             gameId: gameId,
             playerId: playerId,
             rack: updatedPlayers.find((p) => p.playerId === playerId).rack,
@@ -281,7 +296,7 @@ function App() {
         }
 
         setSelectedTile(null);
-        socket.emit("updateBoard", newBoard);
+        socketRef.current.emit("updateBoard", newBoard);
       }
     }
 
@@ -306,7 +321,7 @@ const updatePotentialScore = async () => {
   }
 
   const words = getAllRelevantWords(playedTiles, board);
-  
+
   for (const wordTiles of words) {
       const word = wordTiles.map(tile => tile.tile).join("").toLowerCase();
       if (word.length === 1) {
@@ -358,7 +373,7 @@ const isConnectedToExistingTile = (row, col, board) => {
   };
 
   const isCurrentPlayerTurn = () => {
-    if (!gameStarted || !socket || players.length < 2) {
+    if (!gameStarted || !socketRef.current || players.length < 2) {
       return false;
     }
 
@@ -368,7 +383,7 @@ const isConnectedToExistingTile = (row, col, board) => {
 
   console.log("isCurrentPlayerTurn:", isCurrentPlayerTurn());
   console.log("gameStarted:", gameStarted);
-  console.log("socket:", socket);
+  console.log("socket:", socketRef.current);
   console.log("players:", players);
   console.log("currentPlayer:", currentPlayer);
   console.log("playerId:", playerId);
@@ -378,13 +393,76 @@ const isConnectedToExistingTile = (row, col, board) => {
       players[currentPlayer].socketId
     );
   }
-  console.log("socket.id:", socket ? socket.id : null);
+  console.log("socket.id:", socketRef.current ? socketRef.current.id : null);
 
   const backendOptions = {
     enableMouseEvents: true,
   };
 
   const backend = isTouchDevice() ? TouchBackend : TouchBackend;
+
+  const handleNewGame = () => {
+    // Set gameStarted to false immediately
+    setGameStarted(false);
+
+    // Emit a signal to the server to remove the current game using the old socket
+    if (gameId && socketRef.current) {
+        socketRef.current.emit('removeGame', gameId);
+    }
+
+    // Expire the player-id cookie immediately
+    setCookie('player-id', '', 0);
+    setPlayerId(null);
+
+    if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+    }
+
+    // Reset the game state
+    setBoard(createEmptyBoard());
+    setPlayers([
+        { score: 0, rack: [], socketId: null },
+        { score: 0, rack: [], socketId: null }
+    ]);
+    setCurrentPlayer(0);
+    setBag([]);
+    setSelectedTile(null);
+    setError('');
+    setPotentialScore(0);
+    setShowBlankTileModal(false);
+    setBlankTilePosition(null);
+    setTurnEndScore(0);
+    setShowStarEffects(false);
+    setPlayEndTurnAudio(false);
+    setGameOver(false);
+    setLastPlayedTiles([]);
+    setSecondToLastPlayedTiles([]);
+
+    // Reconnect to the server with a new player ID
+    const newPlayerId = Math.random().toString(36).substr(2, 9);
+    setCookie("player-id", newPlayerId, 365);
+    setPlayerId(newPlayerId);
+
+    const newSocket = io(SERVER_URL);
+    newSocket.on("connect", () => {
+        console.log("New socket connected, emitting joinGame for", newPlayerId);
+        newSocket.emit("joinGame", newPlayerId);
+    });
+
+    setSocket(newSocket);
+    socketRef.current = newSocket;
+
+    // Set a timeout to retry joining a game if still waiting after a delay
+    const retryTimeoutId = setTimeout(() => {
+        if (!gameStarted) {
+            console.log("Retrying joinGame...");
+            socketRef.current.emit("joinGame", newPlayerId);
+        }
+    }, 5000);
+
+    setWaitingRetryId(retryTimeoutId);
+};
 
   return (
     <div className="app m-0 bg-[#F5E6EB]">
@@ -396,29 +474,7 @@ const isConnectedToExistingTile = (row, col, board) => {
       {gameOver && gameStarted && (
         <EndScreen
           players={players}
-          onNewGame={() =>
-            handleNewGame(
-              gameId,
-              setBoard,
-              setPlayers,
-              setCurrentPlayer,
-              setBag,
-              setSelectedTile,
-              setGameStarted,
-              setError,
-              setPotentialScore,
-              setShowBlankTileModal,
-              setBlankTilePosition,
-              setTurnEndScore,
-              setShowStarEffects,
-              setPlayEndTurnAudio,
-              setGameOver,
-              setSocket,
-              SERVER_URL,
-              setLastPlayedTiles,
-              setSecondToLastPlayedTiles
-            )
-          }
+          onNewGame={handleNewGame}
         />
       )}
       {/* {error && <div className="error">{error}</div>} */}
@@ -471,7 +527,7 @@ const isConnectedToExistingTile = (row, col, board) => {
                 setPlayers,
                 setShowBlankTileModal,
                 setBlankTilePosition,
-                socket,
+                socketRef.current,
                 updatePotentialScore,
                 setSelectedTile,
                 gameId,
@@ -543,7 +599,7 @@ const isConnectedToExistingTile = (row, col, board) => {
                   players,
                   currentPlayer,
                   bag,
-                  socket,
+                  socketRef.current,
                   setTurnEndScore,
                   setShowStarEffects,
                   setPlayEndTurnAudio,
@@ -569,7 +625,7 @@ const isConnectedToExistingTile = (row, col, board) => {
                   setSelectedTile,
                   setPotentialScore,
                   setCurrentPlayer,
-                  socket
+                  socketRef.current
                 )
               }
               onPass={() =>
@@ -582,10 +638,10 @@ const isConnectedToExistingTile = (row, col, board) => {
                   setPlayers,
                   setSelectedTile,
                   setPotentialScore,
-                  socket
+                  socketRef.current
                 )
               }
-              onShuffle={() => handleShuffle(players, playerId, socket, gameId, setPlayers)}
+              onShuffle={() => handleShuffle(players, playerId, socketRef.current, gameId, setPlayers)}
               disablePlay={!isCurrentPlayerTurn()}
               disableExchangePass={!isCurrentPlayerTurn()}
             />
@@ -610,7 +666,7 @@ const isConnectedToExistingTile = (row, col, board) => {
                             board,
                             setBoard,
                             updatePotentialScore,
-                            socket,
+                            socketRef.current,
                             setShowBlankTileModal,
                             setBlankTilePosition,
                             players,

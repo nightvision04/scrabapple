@@ -5,6 +5,7 @@ import {
     drawTiles,
     createEmptyBoard,
     createTileBag,
+    setCookie,
     getCookie,
   } from "./utils";
   import { LETTER_VALUES } from "./constants";
@@ -360,81 +361,58 @@ import {
     setShowStarEffects,
     setPlayEndTurnAudio,
     setGameOver,
+    socketRef,
     setSocket,
     SERVER_URL,
     setLastPlayedTiles,
     setSecondToLastPlayedTiles
-  ) => {
-      // Get the current socket instance from the state
-      const currentSocket = setSocket;
+) => {
+    // Expire the player-id cookie immediately
+    setCookie('player-id', '', 0); // Set expiry to 0 to immediately expire
 
-      // Emit a signal to the server to remove the current game
-      if (gameId && currentSocket) {
-          currentSocket.emit('removeGame', gameId);
-      }
+    if (socketRef.current) {
+        socketRef.current.disconnect(); // Disconnect the current socket
+    }
 
-      // Reset the game state
-      setBoard(createEmptyBoard());
-      setPlayers([
-          { score: 0, rack: [], socketId: null },
-          { score: 0, rack: [], socketId: null }
-      ]);
-      setCurrentPlayer(0);
-      setBag(createTileBag());
-      setSelectedTile(null);
-      setGameStarted(false); // Set gameStarted to false initially
-      setError('');
-      setPotentialScore(0);
-      setShowBlankTileModal(false);
-      setBlankTilePosition(null);
-      setTurnEndScore(0);
-      setShowStarEffects(false);
-      setPlayEndTurnAudio(false);
-      setGameOver(false);
-      setLastPlayedTiles([]);
-      setSecondToLastPlayedTiles([]);
+    // Emit a signal to the server to remove the current game
+    if (gameId && socketRef.current) {
+        socketRef.current.emit('removeGame', gameId);
+    }
 
-      // Reconnect to the server
-      const newSocket = io(SERVER_URL);
-      setSocket(newSocket);
+    // Reset the game state
+    setBoard(createEmptyBoard());
+    setPlayers([
+        { score: 0, rack: [], socketId: null },
+        { score: 0, rack: [], socketId: null }
+    ]);
+    setCurrentPlayer(0);
+    setBag(createTileBag());
+    setSelectedTile(null);
+    setGameStarted(false); // Set gameStarted to false initially
+    setError('');
+    setPotentialScore(0);
+    setShowBlankTileModal(false);
+    setBlankTilePosition(null);
+    setTurnEndScore(0);
+    setShowStarEffects(false);
+    setPlayEndTurnAudio(false);
+    setGameOver(false);
+    setLastPlayedTiles([]);
+    setSecondToLastPlayedTiles([]);
 
-      const playerId = getCookie('player-id');
+    // Reconnect to the server
+    const newSocket = io(SERVER_URL);
+    setSocket(newSocket);
+    socketRef.current = newSocket; // Update the ref
 
-      newSocket.on('connect', () => {
-          if (playerId) {
-              newSocket.emit('joinGame', playerId);
-          }
-      });
+    const playerId = getCookie('player-id');
 
-      // Set up other event listeners as before
-      newSocket.on('gameUpdate', (gameState) => {
-          setBoard(gameState.board);
-          setPlayers(gameState.players);
-          setCurrentPlayer(gameState.currentPlayer);
-          setBag(gameState.bag);
-          setGameStarted(gameState.gameStarted);
-          setSecondToLastPlayedTiles(gameState.secondToLastPlayedTiles);
-          setLastPlayedTiles(gameState.lastPlayedTiles);
-      });
-
-      newSocket.on('errorMessage', (message) => {
-          setError(message);
-      });
-
-      newSocket.on('boardUpdate', (newBoard) => {
-          setBoard(newBoard);
-      });
-
-      newSocket.on('rackUpdate', ({ playerId, rack }) => {
-          setPlayers(prevPlayers => {
-              const newPlayers = [...prevPlayers];
-              newPlayers[playerId] = { ...newPlayers[playerId], rack };
-              return newPlayers;
-          });
-      });
-
-      return () => newSocket.close();
-    };
+    newSocket.on('connect', () => {
+        if (playerId) {
+            newSocket.emit('joinGame', playerId);
+        }
+    });
+};
 
     export const handlePlayWord = async (
         gameId,

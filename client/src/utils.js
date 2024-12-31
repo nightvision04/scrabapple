@@ -1,6 +1,6 @@
 import { BOARD_BONUSES, LETTER_VALUES } from './constants';
 
-export const SERVER_URL = "http://10.0.0.82:8080";
+export const SERVER_URL = "http://localhost:8080";
 
 export const createEmptyBoard = () => {
     const board = [];

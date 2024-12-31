@@ -61,18 +61,19 @@ const createEmptyBoard = () => {
 
 // This counts how many of each letter exist in the bag
 const createTileBag = () => {
-    // const distribution = {
-    //     'A': 9, 'B': 2, 'C': 2, 'D': 4, 'E': 12, 'F': 2, 'G': 3,
-    //     'H': 2, 'I': 9, 'J': 1, 'K': 1, 'L': 4, 'M': 2, 'N': 6,
-    //     'O': 8, 'P': 2, 'Q': 1, 'R': 6, 'S': 4, 'T': 6, 'U': 4,
-    //     'V': 2, 'W': 2, 'X': 1, 'Y': 2, 'Z': 1, '_': 0
-    // };
     const distribution = {
-        'A': 18, 'B': 0, 'C': 0, 'D': 0, 'E': 0, 'F': 0, 'G': 0,
-        'H': 18, 'I': 0, 'J': 0, 'K': 0, 'L': 0, 'M': 0, 'N': 0,
-        'O': 0, 'P': 0, 'Q': 0, 'R': 0, 'S': 0, 'T': 0, 'U': 0,
-        'V': 0, 'W': 0, 'X': 0, 'Y': 0, 'Z': 0, '_': 0
+        'A': 9, 'B': 2, 'C': 2, 'D': 4, 'E': 12, 'F': 2, 'G': 3,
+        'H': 2, 'I': 9, 'J': 1, 'K': 1, 'L': 4, 'M': 2, 'N': 6,
+        'O': 8, 'P': 2, 'Q': 1, 'R': 6, 'S': 4, 'T': 6, 'U': 4,
+        'V': 2, 'W': 2, 'X': 1, 'Y': 2, 'Z': 1, '_': 0 // wildcards disaabled for now
     };
+    // To test a fast gamme, use this instead
+    // const distribution = {
+    //     'A': 18, 'B': 0, 'C': 0, 'D': 0, 'E': 0, 'F': 0, 'G': 0,
+    //     'H': 18, 'I': 0, 'J': 0, 'K': 0, 'L': 0, 'M': 0, 'N': 0,
+    //     'O': 0, 'P': 0, 'Q': 0, 'R': 0, 'S': 0, 'T': 0, 'U': 0,
+    //     'V': 0, 'W': 0, 'X': 0, 'Y': 0, 'Z': 0, '_': 0
+    // };
     const bag = [];
     for (const letter in distribution) {
         for (let i = 0; i < distribution[letter]; i++) {
