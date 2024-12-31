@@ -2,9 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@import "@fontsource/inter"; 
+
 @layer base {
   body {
-    @apply bg-gray-100;
+    font-family: "Inter", sans-serif; /* Apply Inter to the entire app */
+
   }
 }
 
@@ -17,4 +20,9 @@
     to {
         transform: rotate(360deg);
     }
+}
+
+body {
+  font-family: "Inter", sans-serif; /* Apply Inter to the entire app */
+
 }
