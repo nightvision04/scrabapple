@@ -64,114 +64,110 @@ function App() {
   const { tapSelectAudio, tapPlaceAudio, endTurnAudio, endGameAudio } =
     useAudioPlayers();
 
-  useEffect(() => {
-    const playerCookie = getCookie("player-id");
-    let playerIdToUse;
-
-    if (playerCookie) {
-      setPlayerId(playerCookie);
-      playerIdToUse = playerCookie;
-    } else {
-      const newPlayerId = Math.random().toString(36).substr(2, 9);
-      setCookie("player-id", newPlayerId, 365);
-      setPlayerId(newPlayerId);
-      playerIdToUse = newPlayerId;
-    }
-
-    const newSocket = io(SERVER_URL);
-    setSocket(newSocket);
-
-    newSocket.on("connect", () => {
-      newSocket.emit("joinGame", playerIdToUse);
-    });
-
-    newSocket.on("gameUpdate", (gameState) => {
-      console.log("Received gameUpdate:", gameState);
-      console.log("Received gameUpdate board:", gameState.board);
-      console.log(
-        "Received currentPlayer in gameUpdate:",
-        gameState.currentPlayer
-      );
-
-      // Ensure players is always an array and has the correct structure
-      const updatedPlayers = gameState.players
-        ? Array.isArray(gameState.players)
-          ? gameState.players
-          : Object.values(gameState.players).map((player, index) => ({
-              playerId: Object.keys(gameState.players)[index],
-              ...player,
-            }))
-        : [];
-
-      setBoard(gameState.board);
-      setPlayers(updatedPlayers);
-      console.log("Updated players array:", updatedPlayers);
-      setCurrentPlayer(gameState.currentPlayer);
-      setBag(gameState.bag);
-      setGameStarted(gameState.gameStarted);
-      console.log("Game started:", gameState.gameStarted);
-      setGameId(gameState.gameId);
-      setSecondToLastPlayedTiles(gameState.secondToLastPlayedTiles || []);
-      setLastPlayedTiles(gameState.lastPlayedTiles || []);
-
-      // Check if new tiles are drawn for the current player and it's their turn
-      if (
-        gameState.newTiles &&
-        gameState.currentPlayer ===
-          updatedPlayers.findIndex((p) => p.playerId === playerId)
-      ) {
-        console.log("New tiles from gameUpdate:", gameState.newTiles);
-        const playerIndex = updatedPlayers.findIndex(
-          (p) => p.playerId === playerId
-        );
-        if (playerIndex !== -1) {
-          updatedPlayers[playerIndex].rack.push(...gameState.newTiles);
+    useEffect(() => {
+        const playerCookie = getCookie("player-id");
+        let playerIdToUse;
+      
+        if (playerCookie) {
+          setPlayerId(playerCookie);
+          playerIdToUse = playerCookie;
+        } else {
+          const newPlayerId = Math.random().toString(36).substr(2, 9);
+          setCookie("player-id", newPlayerId, 365);
+          setPlayerId(newPlayerId);
+          playerIdToUse = newPlayerId;
+        }
+      
+        const newSocket = io(SERVER_URL);
+        setSocket(newSocket);
+      
+        newSocket.on("connect", () => {
+          newSocket.emit("joinGame", playerIdToUse);
+        });
+      
+        newSocket.on("gameUpdate", (gameState) => {
+          console.log("Received gameUpdate:", gameState);
+          console.log("Received gameUpdate board:", gameState.board);
+          console.log("Received currentPlayer in gameUpdate:", gameState.currentPlayer);
+      
+          // Ensure players is always an array and has the correct structure
+          const updatedPlayers = gameState.players
+            ? Array.isArray(gameState.players)
+              ? gameState.players
+              : Object.values(gameState.players).map((player, index) => ({
+                  playerId: Object.keys(gameState.players)[index],
+                  ...player,
+                }))
+            : [];
+      
+          setBoard(gameState.board);
           setPlayers(updatedPlayers);
-        }
-      }
-    });
-
-    newSocket.on("errorMessage", (message) => {
-      setError(message);
-    });
-
-    newSocket.on("boardUpdate", (newBoard) => {
-      setBoard(newBoard);
-    });
-
-    newSocket.on("rackUpdate", ({ playerId, rack }) => {
-      setPlayers((prevPlayers) => {
-        const playerIndex = prevPlayers.findIndex(
-          (p) => p.playerId === playerId
-        );
-        if (playerIndex !== -1) {
-          const updatedPlayers = [...prevPlayers];
-          updatedPlayers[playerIndex] = {
-            ...updatedPlayers[playerIndex],
-            rack,
-          };
-          return updatedPlayers;
-        }
-        return prevPlayers;
-      });
-    });
-
-    newSocket.on("gameOver", (gameState) => {
-      setGameOver(true);
-      setGameId(null);
-    });
-
-    newSocket.on("gameReady", () => {
-      setGameStarted(true);
-      // setGameReady(true);
-    });
-
-    newSocket.on("turnUpdate", (currentPlayer) => {
-      setCurrentPlayer(currentPlayer);
-    });
-
-    return () => newSocket.close();
-  }, []);
+          console.log("Updated players array:", updatedPlayers);
+          setCurrentPlayer(gameState.currentPlayer);
+          setBag(gameState.bag);
+          setGameStarted(gameState.gameStarted);
+          console.log("Game started:", gameState.gameStarted);
+          setGameId(gameState.gameId);
+          setSecondToLastPlayedTiles(gameState.secondToLastPlayedTiles || []);
+          setLastPlayedTiles(gameState.lastPlayedTiles || []);
+      
+          // Check if new tiles are drawn for the current player and it's their turn
+          if (
+            gameState.newTiles &&
+            gameState.currentPlayer ===
+              updatedPlayers.findIndex((p) => p.playerId === playerIdToUse)
+          ) {
+            console.log("New tiles from gameUpdate:", gameState.newTiles);
+            const playerIndex = updatedPlayers.findIndex(
+              (p) => p.playerId === playerIdToUse
+            );
+            if (playerIndex !== -1) {
+              updatedPlayers[playerIndex].rack.push(...gameState.newTiles);
+              setPlayers(updatedPlayers);
+            }
+          }
+        });
+      
+        newSocket.on("errorMessage", (message) => {
+          setError(message);
+        });
+      
+        newSocket.on("boardUpdate", (newBoard) => {
+          setBoard(newBoard);
+        });
+      
+        newSocket.on("rackUpdate", ({ playerId, rack }) => {
+          setPlayers((prevPlayers) => {
+            const playerIndex = prevPlayers.findIndex(
+              (p) => p.playerId === playerId
+            );
+            if (playerIndex !== -1) {
+              const updatedPlayers = [...prevPlayers];
+              updatedPlayers[playerIndex] = {
+                ...updatedPlayers[playerIndex],
+                rack,
+              };
+              return updatedPlayers;
+            }
+            return prevPlayers;
+          });
+        });
+      
+        newSocket.on("gameOver", (gameState) => {
+          setGameOver(true);
+          setGameId(null);
+        });
+      
+        newSocket.on("gameReady", () => {
+          setGameStarted(true);
+        });
+      
+        newSocket.on("turnUpdate", (currentPlayer) => {
+          setCurrentPlayer(currentPlayer);
+        });
+      
+        return () => newSocket.close();
+      }, []);
 
   useEffect(() => {
     if (playEndTurnAudio) {

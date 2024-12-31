@@ -1,7 +1,8 @@
 const { createEmptyBoard, createTileBag, drawTiles } = require('./server-utils');
 
-const activeGames = {}; // Store active games by gameId
-const playerQueue = []; // Queue of players waiting for a game
+// Initialize activeGames as an empty object
+const activeGames = {};
+const playerQueue = [];
 
 const generateGameId = () => {
     return Math.random().toString(36).substr(2, 9);
@@ -14,16 +15,18 @@ const createNewGame = (player1, player2) => {
     const newGame = {
         gameId,
         board: createEmptyBoard(),
-        players: [ // Make players an array
+        players: [
             { playerId: player1, score: 0, rack: drawTiles(createTileBag(), 7), socketId: null },
             { playerId: player2, score: 0, rack: drawTiles(createTileBag(), 7), socketId: null }
         ],
-        currentPlayer: 0, // Start with the first player in the array (index 0)
+        currentPlayer: 0,
         bag: createTileBag(),
-        gameStarted: true
+        gameStarted: true,
+        lastPlayedTiles: [],
+        secondToLastPlayedTiles: []
     };
     activeGames[gameId] = newGame;
-    console.log('New game created:');
+    console.log('New game created:', gameId);
     return gameId;
 };
 
@@ -88,5 +91,6 @@ module.exports = {
     addPlayerToQueue,
     removePlayerFromQueue,
     matchPlayers,
-    updateGame
+    updateGame,
+    activeGames
 };
