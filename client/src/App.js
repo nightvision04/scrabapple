@@ -22,7 +22,7 @@ import {
 } from "./gameLogic";
 import { onDragEnd } from "./dndHandlers";
 import { useAudioPlayers, playAudio } from "./audioUtils";
-import { calculateScore, isValidWord, drawTiles } from "./utils";
+import { calculateScore, isValidWord, drawTiles, isStraightLine } from "./utils";
 import "./App.css";
 import Logo from "./images/logo-black.png";
 import StarEffects from "./components/Effects/StarEffects";
@@ -67,7 +67,7 @@ function App() {
     useEffect(() => {
         const playerCookie = getCookie("player-id");
         let playerIdToUse;
-      
+
         if (playerCookie) {
           setPlayerId(playerCookie);
           playerIdToUse = playerCookie;
@@ -77,19 +77,19 @@ function App() {
           setPlayerId(newPlayerId);
           playerIdToUse = newPlayerId;
         }
-      
+
         const newSocket = io(SERVER_URL);
         setSocket(newSocket);
-      
+
         newSocket.on("connect", () => {
           newSocket.emit("joinGame", playerIdToUse);
         });
-      
+
         newSocket.on("gameUpdate", (gameState) => {
           console.log("Received gameUpdate:", gameState);
           console.log("Received gameUpdate board:", gameState.board);
           console.log("Received currentPlayer in gameUpdate:", gameState.currentPlayer);
-      
+
           // Ensure players is always an array and has the correct structure
           const updatedPlayers = gameState.players
             ? Array.isArray(gameState.players)
@@ -99,7 +99,7 @@ function App() {
                   ...player,
                 }))
             : [];
-      
+
           setBoard(gameState.board);
           setPlayers(updatedPlayers);
           console.log("Updated players array:", updatedPlayers);
@@ -110,7 +110,7 @@ function App() {
           setGameId(gameState.gameId);
           setSecondToLastPlayedTiles(gameState.secondToLastPlayedTiles || []);
           setLastPlayedTiles(gameState.lastPlayedTiles || []);
-      
+
           // Check if new tiles are drawn for the current player and it's their turn
           if (
             gameState.newTiles &&
@@ -127,15 +127,15 @@ function App() {
             }
           }
         });
-      
+
         newSocket.on("errorMessage", (message) => {
           setError(message);
         });
-      
+
         newSocket.on("boardUpdate", (newBoard) => {
           setBoard(newBoard);
         });
-      
+
         newSocket.on("rackUpdate", ({ playerId, rack }) => {
           setPlayers((prevPlayers) => {
             const playerIndex = prevPlayers.findIndex(
@@ -152,20 +152,20 @@ function App() {
             return prevPlayers;
           });
         });
-      
+
         newSocket.on("gameOver", (gameState) => {
           setGameOver(true);
           setGameId(null);
         });
-      
+
         newSocket.on("gameReady", () => {
           setGameStarted(true);
         });
-      
+
         newSocket.on("turnUpdate", (currentPlayer) => {
           setCurrentPlayer(currentPlayer);
         });
-      
+
         return () => newSocket.close();
       }, []);
 
@@ -291,41 +291,91 @@ function App() {
     updatePotentialScore();
   };
 
-  const updatePotentialScore = async () => {
-    const score = calculatePotentialScore(board);
-    let isValid = false;
+  // App.js
+const updatePotentialScore = async () => {
+  // Always calculate the potential score
+  let score = calculatePotentialScore(board);
 
-    // Check if any tiles are played on the board
-    const playedTiles = [];
-    for (let i = 0; i < 15; i++) {
-      for (let j = 0; j < 15; j++) {
-        if (board[i][j]?.tile && !board[i][j]?.original) {
-          playedTiles.push({ row: i, col: j, tile: board[i][j].tile });
-        }
+  // Check if any tiles are played on the board
+  const playedTiles = [];
+  for (let i = 0; i < 15; i++) {
+    for (let j = 0; j < 15; j++) {
+      if (board[i][j]?.tile && !board[i][j]?.original) {
+        playedTiles.push({ row: i, col: j, tile: board[i][j].tile });
       }
     }
+  }
 
-    if (playedTiles.length > 0) {
-      // Get the main word from the played tiles
-      const isHorizontal =
-        playedTiles.length === 1 ||
-        playedTiles.every((tile) => tile.row === playedTiles[0].row);
-      const mainWordTiles = getWordTiles(
-        playedTiles[0].row,
-        playedTiles[0].col,
-        isHorizontal
-      );
-      const mainWord = mainWordTiles
-        .map((tile) => tile.tile)
-        .join("")
-        .toLowerCase();
+  if (playedTiles.length > 0) {
+      let isValid = false;
+    // 1. Check if the played tiles are in a straight line
+    const isHorizontal =
+      playedTiles.length === 1 ||
+      playedTiles.every((tile) => tile.row === playedTiles[0].row);
+    const isVertical =
+      playedTiles.length === 1 ||
+      playedTiles.every((tile) => tile.col === playedTiles[0].col);
 
-      // Validate the main word
+    if (!isHorizontal && !isVertical) {
+      setPotentialScore(0); // Tiles not in a line, score should be 0
+      return;
+    }
+
+    // 2. Get the main word from the played tiles
+    const mainWordTiles = getWordTiles(
+      playedTiles[0].row,
+      playedTiles[0].col,
+      isHorizontal
+    );
+    const mainWord = mainWordTiles
+      .map((tile) => tile.tile)
+      .join("")
+      .toLowerCase();
+
+    // 3. Validate the main word
+    // If the main word has only one letter, check if it's connected to other tiles
+    if (mainWord.length === 1) {
+        isValid = isConnectedToExistingTile(playedTiles[0].row, playedTiles[0].col, board);
+    } else {
       isValid = await isValidWord(mainWord, board);
     }
 
+    // 4. Validate cross words (perpendicular words)
+    if (isValid) {
+      for (const tile of playedTiles) {
+        const crossWordTiles = getWordTiles(tile.row, tile.col, !isHorizontal);
+        if (crossWordTiles.length > 1) {
+          const crossWord = crossWordTiles
+            .map((t) => t.tile)
+            .join("")
+            .toLowerCase();
+          if (!(await isValidWord(crossWord, board))) {
+            isValid = false;
+            break; 
+          }
+        }
+      }
+    }
+    // Update the potential score only if the placement is valid
     setPotentialScore(isValid ? score : 0);
-  };
+  } else {
+      // If no tiles are played, set the potential score to 0
+      setPotentialScore(0);
+  }
+};
+
+// Helper function to check for connection to existing tiles, especially the first tile
+const isConnectedToExistingTile = (row, col, board) => {
+  const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]]; // Up, Down, Left, Right
+  for (const [dr, dc] of directions) {
+      const newRow = row + dr;
+      const newCol = col + dc;
+      if (newRow >= 0 && newRow < 15 && newCol >= 0 && newCol < 15 && board[newRow][newCol]?.tile) {
+          return true;
+      }
+  }
+  return false;
+};
 
   const getWordTiles = (startRow, startCol, isHorizontal) => {
     let tiles = [];
