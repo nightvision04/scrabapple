@@ -14,7 +14,7 @@ const Tile = forwardRef(({ value, isSelected, onTileClick, draggableId, index, c
                     ${isSelected ? 'ring-2 ring-blue-500' : ''}
                     hover:brightness-105 transition-all
                     transform hover:-translate-y-0.5
-                    ${!className ? 'bg-gradient-to-br from-[#f4e4bc] to-[#ecd29b]' : ''}
+                    ${!className ? 'bg-gradient-to-br from-[#FAF7CA] to-[#ecd29b]' : ''}
                 `}
                 onClick={() => onTileClick?.()}
             >

@@ -44,7 +44,7 @@ const Board = ({
       <div className="aspect-square w-full">
         <div
           role="grid"
-          className="grid grid-cols-15 gap-1 h-full w-full bg-amber-900 p-2 rounded-lg shadow-lg"
+          className="grid grid-cols-15 gap-[2px] h-full w-full bg-[#EFE1F5] p-2 rounded-lg shadow-lg"
         >
           {board.map((row, rowIndex) =>
             row.map((cell, colIndex) => (
@@ -70,15 +70,15 @@ const Board = ({
                         value={(isCurrentPlayerTurn || cell.original) ? cell.tile : "?"}
                         isSelected={false}
                         className={
-                          isTilePlayedThisTurn(rowIndex, colIndex, board) ? 'bg-blue-200 text-black shadow-lg' : 
-                          isTilePlayedLastTurn(rowIndex, colIndex, lastPlayedTiles) ? 'bg-orange-300 text-black shadow-lg' : ''
+                          isTilePlayedThisTurn(rowIndex, colIndex, board) ? 'bg-gradient-to-br from-[#F0FCF8] to-[#7EFFF4] text-black shadow-lg border-[#00B5C2] border-[2px]' : 
+                          isTilePlayedLastTurn(rowIndex, colIndex, lastPlayedTiles) ? 'bg-gradient-to-br from-[#FDECF5] to-[#FAA0EB] text-black shadow-lg' : ''
                         }
                       />
                     )}
                     {!cell.tile && (
                       <>
                         {rowIndex === 7 && colIndex === 7 && (
-                          <span className="bg-pink-300 text-pink-900 hover:bg-pink-200 text-[12px]">
+                          <span className=" text-pink-900 hover:bg-pink-200 text-[12px]">
                             ★
                           </span>
                         )}
@@ -105,15 +105,15 @@ const Board = ({
 const getBonusClassName = (bonus) => {
   switch (bonus) {
     case "tw":
-      return "bg-rose-600 text-black hover:bg-rose-500";
+      return "bg-[#D9BCFC] text-black hover:bg-rose-500";
     case "dw":
-      return "bg-pink-300 text-black-900 hover:bg-pink-200";
+      return "bg-[#FDC5E4] text-black-900 hover:bg-pink-200";
     case "tl":
-      return "bg-blue-500 text-black-900 hover:bg-blue-400";
+      return "bg-[#C3E9F6] text-black-900 hover:bg-blue-400";
     case "dl":
-      return "bg-blue-200 text-black-900 hover:bg-blue-100";
+      return "bg-[#D8FBEC] text-black-900 hover:bg-blue-100";
     default:
-      return "bg-[#e9dcc9] hover:bg-amber-100";
+      return "bg-[#FEFAE4] hover:bg-amber-100";
   }
 };
 

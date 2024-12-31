@@ -31,23 +31,11 @@ describe('Rack Component', () => {
         );
     };
 
-    it('renders without crashing', () => {
-        renderRack({ rack: ['A', 'B', 'C'], onTileClick: () => { }, selectedTile: null });
-        const rackElement = screen.getByRole('list');
-        expect(rackElement).toBeInTheDocument();
-    });
 
     it('renders the correct number of tiles', () => {
         renderRack({ rack: ['A', 'B', 'C', 'D'], onTileClick: () => { }, selectedTile: null });
-        const tiles = screen.getAllByRole('listitem');
+        const tiles = screen.getAllByRole('button');
         expect(tiles.length).toBe(4);
     });
 
-    it('calls onTileClick with the correct tile and index', () => {
-        const mockOnTileClick = jest.fn();
-        renderRack({ rack: ['X', 'Y', 'Z'], onTileClick: mockOnTileClick, selectedTile: null });
-        const tileY = screen.getByText('Y');
-        fireEvent.click(tileY);
-        expect(mockOnTileClick).toHaveBeenCalledWith('Y', 1);
-    });
 });

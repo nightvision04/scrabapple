@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from "react";
 import io from "socket.io-client";
 import { DragDropContext, Droppable } from "react-beautiful-dnd";
-import { HTML5Backend } from "react-dnd-html5-backend";
 import { TouchBackend } from "react-dnd-touch-backend";
 import Board from "./components/Board/Board";
 import Rack from "./components/Rack/Rack";
@@ -424,10 +423,10 @@ const isConnectedToExistingTile = (row, col, board) => {
     enableMouseEvents: true,
   };
 
-  const backend = isTouchDevice() ? TouchBackend : HTML5Backend;
+  const backend = isTouchDevice() ? TouchBackend : TouchBackend;
 
   return (
-    <div className="app m-0 bg-amber-50">
+    <div className="app m-0 bg-[#F5E6EB]">
       <img
         src={Logo}
         alt="Scrabble Logo"
