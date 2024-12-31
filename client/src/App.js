@@ -21,7 +21,7 @@ import {
 } from "./gameLogic";
 import { onDragEnd } from "./dndHandlers";
 import { useAudioPlayers, playAudio } from "./audioUtils";
-import { calculateScore, isValidWord, getAllRelevantWords, SERVER_URL } from "./utils";
+import { calculateScore, isValidWord, getAllRelevantWords } from "./utils";
 import "./App.css";
 import Logo from "./images/logo-black.png";
 import StarEffects from "./components/Effects/StarEffects";
@@ -67,8 +67,8 @@ function App() {
         let playerIdToUse;
 
         const connectSocket = (playerIdToUse) => {
-            console.log(`NEW SOCKET ${process.env.REACT_APP_SERVER_URL}:${process.env.PORT}`);
-            const newSocket = io(`${process.env.REACT_APP_SERVER_URL}:${process.env.PORT}`);
+            console.log(`NEW SOCKET ${process.env.REACT_APP_SERVER_URL}`);
+            const newSocket = io(process.env.REACT_APP_SERVER_URL);
             socketRef.current = newSocket;
             setSocket(newSocket);
             newSocket.on("connect", () => {
@@ -445,7 +445,7 @@ const isConnectedToExistingTile = (row, col, board) => {
     setCookie("player-id", newPlayerId, 365);
     setPlayerId(newPlayerId);
 
-    const newSocket = io(`${process.env.REACT_APP_SERVER_URL}:${process.env.PORT}`);
+    const newSocket = io(process.env.REACT_APP_SERVER_URL);
     newSocket.on("connect", () => {
         console.log("New socket connected, emitting joinGame for", newPlayerId);
         newSocket.emit("joinGame", newPlayerId);
