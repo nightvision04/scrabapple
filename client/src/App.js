@@ -67,7 +67,8 @@ function App() {
         let playerIdToUse;
 
         const connectSocket = (playerIdToUse) => {
-            const newSocket = io(SERVER_URL);
+            console.log(`NEW SOCKET ${process.env.REACT_APP_SERVER_URL}:${process.env.PORT}`);
+            const newSocket = io(`${process.env.REACT_APP_SERVER_URL}:${process.env.PORT}`);
             socketRef.current = newSocket;
             setSocket(newSocket);
             newSocket.on("connect", () => {
@@ -444,7 +445,7 @@ const isConnectedToExistingTile = (row, col, board) => {
     setCookie("player-id", newPlayerId, 365);
     setPlayerId(newPlayerId);
 
-    const newSocket = io(SERVER_URL);
+    const newSocket = io(`${process.env.REACT_APP_SERVER_URL}:${process.env.PORT}`);
     newSocket.on("connect", () => {
         console.log("New socket connected, emitting joinGame for", newPlayerId);
         newSocket.emit("joinGame", newPlayerId);
