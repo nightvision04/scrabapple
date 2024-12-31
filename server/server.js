@@ -14,7 +14,7 @@ const {
   updateGame,
   activeGames,
 } = require("./gameManager");
-const { drawTiles } = require("./server-utils");
+const { drawTiles, calculateScore } = require("./server-utils");
 
 const app = express();
 const server = http.createServer(app);
@@ -188,51 +188,38 @@ io.on("connection", (socket) => {
         if (game) {
             const nextPlayer = (currentPlayer + 1) % 2;
     
-            // Log the current player's rack before the update
-            console.log(
-                `[Game ${gameId}] Player ${game.players[currentPlayer].playerId}'s rack before playing:`,
-                game.players[currentPlayer].rack
-            );
+            // Calculate the score for the played word
+            const wordScore = calculateScore(lastPlayedTiles, board);
     
-            // Update the player's rack on the server-side
-            const playerIndex = currentPlayer;
-            if (playerIndex !== -1) {
-                // Remove played tiles
-                game.players[playerIndex].rack = game.players[playerIndex].rack.filter((tile) => {
-                    return !lastPlayedTiles.some((playedTile) => playedTile.tile === tile);
-                });
+            // Create an updated players array with the new score
+            const updatedPlayers = game.players.map((player, index) => {
+                if (index === currentPlayer) {
+                    return {
+                        ...player,
+                        rack: player.rack.filter((tile) => {
+                            return !lastPlayedTiles.some((playedTile) => playedTile.tile === tile);
+                        }),
+                        score: player.score + wordScore
+                    };
+                }
+                return player;
+            });
     
-                // Add new tiles
-                game.players[playerIndex].rack.push(...newTiles);
-            } else {
-                console.error("Error: Could not find player to update rack:", game.players[currentPlayer].playerId);
-            }
+            // Add new tiles to the current player's rack
+            updatedPlayers[currentPlayer].rack.push(...newTiles);
     
             // Update the game state
             const updatedGame = {
                 ...game,
                 board,
                 bag,
-                players: game.players,
+                players: updatedPlayers,
                 currentPlayer: nextPlayer,
                 lastPlayedTiles: lastPlayedTiles || [],
                 secondToLastPlayedTiles: game.lastPlayedTiles || [],
             };
     
             updateGame(gameId, updatedGame);
-    
-            // Log the new tiles drawn and the updated bag
-            console.log(
-                `[Game ${gameId}] New tiles drawn for player ${game.players[currentPlayer].playerId}:`,
-                newTiles
-            );
-            console.log(`[Game ${gameId}] Updated bag after drawing tiles:`, bag);
-    
-            // Log the current player's rack after the update
-            console.log(
-                `[Game ${gameId}] Player ${game.players[currentPlayer].playerId}'s rack after playing:`,
-                game.players[currentPlayer].rack
-            );
     
             // Send gameUpdate to the current player with newTiles information
             io.to(game.players[currentPlayer].socketId).emit("gameUpdate", {
@@ -247,7 +234,7 @@ io.on("connection", (socket) => {
     
             io.to(gameId).emit("turnUpdate", nextPlayer);
             console.log(
-                `[Game ${gameId}] Word played by player: ${game.players[currentPlayer].playerId}, next turn: ${game.players[nextPlayer].playerId}`
+                `[Game ${gameId}] Word played by player: ${game.players[currentPlayer].playerId}, score: ${wordScore}, next turn: ${game.players[nextPlayer].playerId}`
             );
         } else {
             console.error("playWord - Error: Could not find game:", gameId);

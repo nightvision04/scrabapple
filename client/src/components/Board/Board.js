@@ -105,13 +105,13 @@ const Board = ({
 const getBonusClassName = (bonus) => {
   switch (bonus) {
     case "tw":
-      return "bg-rose-600 text-white hover:bg-rose-500";
+      return "bg-rose-600 text-black hover:bg-rose-500";
     case "dw":
       return "bg-pink-300 text-black-900 hover:bg-pink-200";
     case "tl":
-      return "bg-blue-500 text-white hover:bg-blue-400";
+      return "bg-blue-500 text-black-900 hover:bg-blue-400";
     case "dl":
-      return "bg-blue-200 text-blue-900 hover:bg-blue-100";
+      return "bg-blue-200 text-black-900 hover:bg-blue-100";
     default:
       return "bg-[#e9dcc9] hover:bg-amber-100";
   }

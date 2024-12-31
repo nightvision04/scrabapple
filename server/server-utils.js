@@ -103,7 +103,7 @@ const isValidWord = async (word, board) => {
     }
 };
 
-const calculateScore = (playedTiles, board) => {
+export const calculateScore = (playedTiles, board) => {
     if (playedTiles.length === 0) return 0;
 
     const newlyPlayedTiles = new Set(playedTiles.map(tile => `${tile.row},${tile.col}`));
