@@ -2,6 +2,7 @@ import { BOARD_BONUSES, LETTER_VALUES } from './constants';
 
 const PORT = process.env.PORT || 8080;
 export const SERVER_URL = `${process.env.REACT_APP_SERVER_URL}:${PORT}`;
+console.log("Loaded from env, SERVER_URL:", SERVER_URL);
 
 export const createEmptyBoard = () => {
     const board = [];
