@@ -69,7 +69,7 @@ const Rack = ({ rack, onTileClick, selectedTile }) => {
     return (
         <Droppable droppableId="rack" direction="horizontal">
             {(provided) => (
-                <div className="flex justify-center w-full mt-3">
+                <div className="flex justify-center w-full mt-3 sm:max-w-[620px]">
                     <div className="w-[60%] relative" style={{ perspective: '1200px' }}>
                         {/* Enhanced shadow system */}
                         <div className="absolute w-full h-8 bg-black/30 bottom-0 rounded-full blur-lg"></div>
