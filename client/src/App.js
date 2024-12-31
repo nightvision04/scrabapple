@@ -39,12 +39,11 @@ function isTouchDevice() {
 
 
 export const getServerUrl = () => {
-  // In production, use the full URL from env var if available
+  // dev
   if (process.env.REACT_APP_SERVER_URL) {
       return process.env.REACT_APP_SERVER_URL;
   }
-  
-  // In development, use the current origin
+  // prod
   return window.location.origin;
 };
 
