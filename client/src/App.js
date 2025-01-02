@@ -18,6 +18,7 @@ import {
   handlePlayWord,
   handleShuffle,
   handlePass,
+  handleTurnTimeout,
 } from "./gameLogic";
 import { onDragEnd } from "./dndHandlers";
 import { useAudioPlayers, playAudio } from "./audioUtils";
@@ -28,6 +29,8 @@ import StarEffects from "./components/Effects/StarEffects";
 import YourTurnEffect from "./components/Effects/YourTurnEffect";
 import EndScreen from "./components/EndScreen/EndScreen";
 import Waiting from "./components/Waiting/Waiting";
+import Timer from "./components/Timer/Timer";
+import GameTimer from "./components/Timer/GameTimer";
 
 function isTouchDevice() {
   return (
@@ -70,6 +73,10 @@ function App() {
   const [lastPlayedTiles, setLastPlayedTiles] = useState([]);
   const [secondToLastPlayedTiles, setSecondToLastPlayedTiles] = useState([]);
   const [waitingRetryId, setWaitingRetryId] = useState(null);
+  const [turnTimerKey, setTurnTimerKey] = useState(0);
+  const [isTurnTimerPaused, setIsTurnTimerPaused] = useState(false);
+  const [gameTimerKey, setGameTimerKey] = useState(0);
+  const [isGameTimerPaused, setIsGameTimerPaused] = useState(false);
 
   const { tapSelectAudio, tapPlaceAudio, endTurnAudio, endGameAudio } =
     useAudioPlayers();
@@ -217,6 +224,26 @@ function App() {
       playAudio(endGameAudio);
     }
   }, [gameOver, endGameAudio]);
+
+  useEffect(() => {
+    if (gameStarted) {
+      // Reset timer for both players when turn changes
+      setTurnTimerKey((prevKey) => prevKey + 1);
+      // Never pause the timer
+      setIsTurnTimerPaused(false);
+    } else {
+      setIsTurnTimerPaused(true);
+    }
+  }, [currentPlayer, gameStarted]);
+
+    useEffect(() => {
+        if (gameStarted) {
+            setIsGameTimerPaused(false);
+            setGameTimerKey((prevKey) => prevKey + 1);
+        } else {
+            setIsGameTimerPaused(true);
+        }
+    }, [gameStarted]);
 
   const handleRackTileClick = (tile, index) => {
     playAudio(tapSelectAudio);
@@ -477,228 +504,259 @@ const isConnectedToExistingTile = (row, col, board) => {
     setWaitingRetryId(retryTimeoutId);
 };
 
-  return (
-    <div className="app m-0 bg-[#F5E6EB]">
-      <img
-        src={Logo}
-        alt="Scrabble Logo"
-        className="logo pt-2 pb-0 max-w-[145px] sm:max-w-[220px]"
+return (
+  <div className="app m-0 bg-[#F5E6EB] relative">
+    <div className="absolute top-2 right-4">
+      <Timer 
+        key={turnTimerKey} 
+        duration={150} // Turn timer in seconds. 2.5 minutes
+        handleTurnTimeout={handleTurnTimeout}
+        isPaused={isTurnTimerPaused} 
+        gameId={gameId}
+        board={board}
+        players={players}
+        currentPlayer={currentPlayer}
+        setBoard={setBoard}
+        setPlayers={setPlayers}
+        setSelectedTile={setSelectedTile}
+        setPotentialScore={setPotentialScore}
+        socket={socketRef.current}
+        setTurnTimerKey={setTurnTimerKey}
+        gameStarted={gameStarted}
+        playerId={playerId}
       />
-      {gameOver && gameStarted && (
-        <EndScreen
-          players={players}
-          onNewGame={handleNewGame}
+    </div>
+    <div className="absolute top-2 left-4">
+    <GameTimer 
+      key={gameTimerKey} 
+      duration={1800} // 30 mminute game timer
+      onTimeout={() => {}} 
+      isPaused={isGameTimerPaused}
+      setGameOver={setGameOver}
+    />
+    </div>
+    <img
+      src={Logo}
+      alt="Scrabble Logo"
+      className="logo pt-2 pb-0 max-w-[145px] sm:max-w-[220px]"
+    />
+    {gameOver && gameStarted && (
+      <EndScreen
+        players={players}
+        onNewGame={handleNewGame}
+      />
+    )}
+    {!gameStarted && <Waiting />}
+    {!gameOver && gameStarted && (
+      <>
+        <div
+          className={
+            isCurrentPlayerTurn()
+              ? "font-bold text-sm my-2"
+              : "text-sm my-2"
+          }
+        >
+          {isCurrentPlayerTurn()
+            ? "Your Turn"
+            : "Waiting for Opponent"}
+        </div>
+        <YourTurnEffect isCurrentPlayerTurn={isCurrentPlayerTurn()} />
+
+        <StarEffects
+          isComplete={showStarEffects}
+          setIsComplete={setShowStarEffects}
         />
-      )}
-      {/* {error && <div className="error">{error}</div>} */}
-      {!gameStarted && <Waiting />}
-      {!gameOver && gameStarted && (
-        <>
-          <div
-            className={
-              isCurrentPlayerTurn()
-                ? "font-bold text-sm my-2"
-                : "text-sm my-2"
-            }
-          >
-            {isCurrentPlayerTurn()
-              ? "Your Turn"
-              : "Waiting for Opponent"}
-          </div>
-          <YourTurnEffect isCurrentPlayerTurn={isCurrentPlayerTurn()} />
+        <Scoreboard players={players} currentPlayer={currentPlayer} />
 
-          <StarEffects
-            isComplete={showStarEffects}
-            setIsComplete={setShowStarEffects}
+        <div className="flex items-center justify-center text-xs gap-4">
+          <span>
+            Points:{" "}
+            {potentialScore === 0 &&
+            (getWordTiles().length > 0 ||
+              calculatePotentialScore(board) === 0)
+              ? "-"
+              : `+${potentialScore}`}
+          </span>
+          <TilesLeft
+            board={board}
+            players={players}
+            gameStarted={gameStarted}
           />
-          <Scoreboard players={players} currentPlayer={currentPlayer} />
-
-          <div className="flex items-center justify-center text-xs gap-4">
-            <span>
-              Points:{" "}
-              {potentialScore === 0 &&
-              (getWordTiles().length > 0 ||
-                calculatePotentialScore(board) === 0)
-                ? "-"
-                : `+${potentialScore}`}
-            </span>
-            {/* Use the TilesLeft component here */}
-            <TilesLeft
-              board={board}
-              players={players}
-              gameStarted={gameStarted}
-            />
-          </div>
-          <DragDropContext
-            onDragEnd={(result) =>
-              onDragEnd(
-                result,
+        </div>
+        <DragDropContext
+          onDragEnd={(result) =>
+            onDragEnd(
+              result,
+              board,
+              players,
+              currentPlayer,
+              setBoard,
+              setPlayers,
+              setShowBlankTileModal,
+              setBlankTilePosition,
+              socketRef.current,
+              updatePotentialScore,
+              setSelectedTile,
+              gameId,
+              playerId
+            )
+          }
+          backend={backend}
+          options={backendOptions}
+        >
+          <Droppable droppableId="board">
+            {(provided) => (
+              <Board
+                innerRef={provided.innerRef}
+                {...provided.droppableProps}
+                board={board}
+                onTileClick={handleBoardTileClick}
+                isCurrentPlayerTurn={isCurrentPlayerTurn()}
+                currentPlayer={currentPlayer}
+                lastPlayedTiles={lastPlayedTiles}
+                secondToLastPlayedTiles={secondToLastPlayedTiles}
+              >
+                {provided.placeholder}
+              </Board>
+            )}
+          </Droppable>
+          <Droppable droppableId="rack" direction="horizontal">
+            {(provided) => (
+              <Rack
+                innerRef={provided.innerRef}
+                {...provided.droppableProps}
+                rack={
+                  players.length > 0
+                    ? players.find((p) => p.playerId === playerId)?.rack
+                    : []
+                }
+                onTileClick={handleRackTileClick}
+                selectedTile={selectedTile}
+                isCurrentPlayerTurn={isCurrentPlayerTurn}
+              >
+                {players.some((p) => p.playerId === playerId) &&
+                  players
+                    .find((p) => p.playerId === playerId)
+                    ?.rack.map((tile, index) => (
+                      <Tile
+                        key={index}
+                        draggableId={`tile-${index}`}
+                        index={index}
+                        value={tile}
+                        isSelected={
+                          selectedTile &&
+                          selectedTile.tile === tile &&
+                          selectedTile.from.type === "rack" &&
+                          selectedTile.from.index === index
+                        }
+                        onTileClick={() =>
+                          handleRackTileClick(tile, index)
+                        }
+                      />
+                    ))}
+                {provided.placeholder}
+              </Rack>
+            )}
+          </Droppable>
+          <GameControls
+            onPlay={() =>
+              handlePlayWord(
+                gameId,
+                board,
+                players,
+                currentPlayer,
+                bag,
+                socketRef.current,
+                setTurnEndScore,
+                setShowStarEffects,
+                setPlayEndTurnAudio,
+                setCurrentPlayer,
+                setSelectedTile,
+                setPotentialScore,
+                setBag,
+                setBoard,
+                setPlayers,
+                setLastPlayedTiles,
+                setSecondToLastPlayedTiles,
+                lastPlayedTiles,
+                setTurnTimerKey
+            )
+            }
+            onExchange={() =>
+              handleExchange(
+                gameId,
+                selectedTile,
+                players,
+                currentPlayer,
+                board,
+                setBoard,
+                setPlayers,
+                setSelectedTile,
+                setPotentialScore,
+                setCurrentPlayer,
+                socketRef.current,
+                setTurnTimerKey,
+              )
+            }
+            onPass={() =>
+              handlePass(
+                gameId,
                 board,
                 players,
                 currentPlayer,
                 setBoard,
                 setPlayers,
-                setShowBlankTileModal,
-                setBlankTilePosition,
-                socketRef.current,
-                updatePotentialScore,
                 setSelectedTile,
-                gameId,
-                playerId
+                setPotentialScore,
+                socketRef.current,
+                setTurnTimerKey,
               )
             }
-            backend={backend}
-            options={backendOptions}
-          >
-            <Droppable droppableId="board">
-              {(provided) => (
-                <Board
-                  innerRef={provided.innerRef}
-                  {...provided.droppableProps}
-                  board={board}
-                  onTileClick={handleBoardTileClick}
-                  isCurrentPlayerTurn={isCurrentPlayerTurn()}
-                  currentPlayer={currentPlayer}
-                  lastPlayedTiles={lastPlayedTiles}
-                  secondToLastPlayedTiles={secondToLastPlayedTiles}
-                >
-                  {provided.placeholder}
-                </Board>
-              )}
-            </Droppable>
-            <Droppable droppableId="rack" direction="horizontal">
-              {(provided) => (
-                <Rack
-                  innerRef={provided.innerRef}
-                  {...provided.droppableProps}
-                  rack={
-                    players.length > 0
-                      ? players.find((p) => p.playerId === playerId)?.rack
-                      : []
-                  }
-                  onTileClick={handleRackTileClick}
-                  selectedTile={selectedTile}
-                  isCurrentPlayerTurn={isCurrentPlayerTurn}
-                >
-                  {players.some((p) => p.playerId === playerId) &&
-                    players
-                      .find((p) => p.playerId === playerId)
-                      ?.rack.map((tile, index) => (
-                        <Tile
-                          key={index}
-                          draggableId={`tile-${index}`}
-                          index={index}
-                          value={tile}
-                          isSelected={
-                            selectedTile &&
-                            selectedTile.tile === tile &&
-                            selectedTile.from.type === "rack" &&
-                            selectedTile.from.index === index
-                          }
-                          onTileClick={() =>
-                            handleRackTileClick(tile, index)
-                          }
-                        />
-                      ))}
-                  {provided.placeholder}
-                </Rack>
-              )}
-            </Droppable>
-            <GameControls
-              onPlay={() =>
-                handlePlayWord(
-                  gameId,
-                  board,
-                  players,
-                  currentPlayer,
-                  bag,
-                  socketRef.current,
-                  setTurnEndScore,
-                  setShowStarEffects,
-                  setPlayEndTurnAudio,
-                  setCurrentPlayer,
-                  setSelectedTile,
-                  setPotentialScore,
-                  setBag,
-                  setBoard,
-                  setPlayers,
-                  setLastPlayedTiles,
-                  setSecondToLastPlayedTiles
-                )
-              }
-              onExchange={() =>
-                handleExchange(
-                  gameId,
-                  selectedTile,
-                  players,
-                  currentPlayer,
-                  board,
-                  setBoard,
-                  setPlayers,
-                  setSelectedTile,
-                  setPotentialScore,
-                  setCurrentPlayer,
-                  socketRef.current
-                )
-              }
-              onPass={() =>
-                handlePass(
-                  gameId,
-                  board,
-                  players,
-                  currentPlayer,
-                  setBoard,
-                  setPlayers,
-                  setSelectedTile,
-                  setPotentialScore,
-                  socketRef.current
-                )
-              }
-              onShuffle={() => handleShuffle(players, playerId, socketRef.current, gameId, setPlayers)}
-              disablePlay={!isCurrentPlayerTurn()}
-              disableExchangePass={!isCurrentPlayerTurn()}
-            />
-          </DragDropContext>
-          {showBlankTileModal && (
-            <div className="modal-container fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
-              <div className="modal-content bg-white p-4 rounded shadow-lg">
-                <h2 className="text-lg font-bold mb-2">
-                  Select a Letter for the Blank Tile
-                </h2>
-                <div className="alphabet-grid grid grid-cols-6 gap-2">
-                  {Array.from({ length: 26 }, (_, i) => {
-                    const letter = String.fromCharCode(65 + i);
-                    return (
-                      <button
-                        key={letter}
-                        className="p-2 bg-gray-200 rounded hover:bg-gray-300"
-                        onClick={() =>
-                          handleSelectBlankTile(
-                            letter,
-                            blankTilePosition,
-                            board,
-                            setBoard,
-                            updatePotentialScore,
-                            socketRef.current,
-                            setShowBlankTileModal,
-                            setBlankTilePosition,
-                            players,
-                            playerId
-                          )
-                        }
-                      >
-                        {letter}
-                      </button>
-                    );
-                  })}
-                </div>
+            onShuffle={() => handleShuffle(players, playerId, socketRef.current, gameId, setPlayers)}
+            disablePlay={!isCurrentPlayerTurn()}
+            disableExchangePass={!isCurrentPlayerTurn()}
+          />
+        </DragDropContext>
+        {showBlankTileModal && (
+          <div className="modal-container fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="modal-content bg-white p-4 rounded shadow-lg">
+              <h2 className="text-lg font-bold mb-2">
+                Select a Letter for the Blank Tile
+              </h2>
+              <div className="alphabet-grid grid grid-cols-6 gap-2">
+                {Array.from({ length: 26 }, (_, i) => {
+                  const letter = String.fromCharCode(65 + i);
+                  return (
+                    <button
+                      key={letter}
+                      className="p-2 bg-gray-200 rounded hover:bg-gray-300"
+                      onClick={() =>
+                        handleSelectBlankTile(
+                          letter,
+                          blankTilePosition,
+                          board,
+                          setBoard,
+                          updatePotentialScore,
+                          socketRef.current,
+                          setShowBlankTileModal,
+                          setBlankTilePosition,
+                          players,
+                          playerId
+                        )
+                      }
+                    >
+                      {letter}
+                    </button>
+                  );
+                })}
               </div>
             </div>
-          )}
-        </>
-      )}
-    </div>
-  );
+          </div>
+        )}
+      </>
+    )}
+  </div>
+);
 }
 
 export default App;

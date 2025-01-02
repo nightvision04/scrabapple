@@ -3,6 +3,13 @@ import React from 'react';
 const EndScreen = ({ players, onNewGame }) => {
     const winner = players[0].score > players[1].score ? 1 : (players[1].score > players[0].score ? 2 : 0);
 
+    const handleNewGameClick = () => {
+        // First call the original onNewGame handler to clean up game state
+        onNewGame();
+        // Then force a complete reset of the application state
+        window.location.reload();
+    };
+
     return (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
             <div className="bg-white p-8 rounded-lg shadow-lg text-center">
@@ -19,7 +26,7 @@ const EndScreen = ({ players, onNewGame }) => {
                 </div>
                 <button
                     className="mt-6 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-700"
-                    onClick={onNewGame}
+                    onClick={handleNewGameClick}
                 >
                     New Game
                 </button>

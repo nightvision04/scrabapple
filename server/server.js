@@ -283,9 +283,10 @@ io.on("connection", (socket) => {
         const { gameId, currentPlayer } = data;
         const game = getGame(gameId);
         if (game) {
-            // Switch to the next player
-            const nextPlayer = (currentPlayer + 1) % game.players.length;
+            const nextPlayer = (currentPlayer + 1) % 2;
             game.currentPlayer = nextPlayer;
+            game.turnEndTime = Date.now() + (150 * 1000); // Reset turn timer
+            
             updateGame(gameId, game);
             io.to(gameId).emit("gameUpdate", game);
         } else {
@@ -332,6 +333,38 @@ io.on("connection", (socket) => {
             removePlayerFromQueue(socket.playerId);
         }
     });
+
+    socket.on("timeUpdate", ({ gameId, timeLeft }) => {
+        // Broadcast time update to all players in the game except sender
+        socket.to(gameId).emit("timeUpdate", { timeLeft });
+    });
+
+    socket.on("requestTurnEndTime", ({ gameId }) => {
+        console.log("Turn end time requested for game:", gameId);
+        const game = getGame(gameId);
+        if (game) {
+            // If no end time exists or we're starting a new turn, create a new end time
+            if (!game.turnEndTime || game.turnEndTime < Date.now()) {
+                game.turnEndTime = Date.now() + (150 * 1000); // 2.5 minutes
+                updateGame(gameId, game);
+            }
+            console.log("Sending turn end time:", game.turnEndTime);
+            io.in(gameId).emit("turnEndTime", { endTime: game.turnEndTime });
+        }
+    });
+    
+    socket.on("requestGameEndTime", ({ gameId }) => {
+        const game = getGame(gameId);
+        if (game) {
+            // If no end time exists, create one
+            if (!game.gameEndTime) {
+                game.gameEndTime = Date.now() + (1800 * 1000); // 30 minutes in milliseconds
+            }
+            socket.emit("gameEndTime", { endTime: game.gameEndTime });
+        }
+    });
+
+
 });
 
 // Bind server to 0.0.0.0 to listen on all interfaces

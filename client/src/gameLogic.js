@@ -124,7 +124,8 @@ import {
     setSelectedTile,
     setPotentialScore,
     setCurrentPlayer,
-    socket
+    socket,
+    setTurnTimerKey,
   ) => {
     if (selectedTile && selectedTile.from.type === "rack") {
       const tileToExchange = selectedTile.tile;
@@ -158,6 +159,9 @@ import {
         setSelectedTile(null);
         setPotentialScore(0);
 
+        // Reset the turn timer and increment the key
+        setTurnTimerKey((prevKey) => prevKey + 1);
+
         // Switch to the next player
         const nextPlayer = (currentPlayer + 1) % 2;
         //   setCurrentPlayer(nextPlayer);
@@ -187,6 +191,103 @@ import {
     }
   };
 
+  export const checkIsCurrentPlayerTurn = (
+    gameStarted,
+    socketRef,
+    players,
+    currentPlayer,
+    playerId
+  ) => {
+    if (!gameStarted || !socketRef.current || players.length < 2) {
+      return false;
+    }
+
+    // Check if the current player's ID matches the ID of the player whose turn it is
+    return players[currentPlayer]?.playerId === playerId;
+  };
+
+  export const handleTurnTimeout = (
+    gameId,
+    board,
+    players,
+    currentPlayer,
+    setBoard,
+    setPlayers,
+    setSelectedTile,
+    setPotentialScore,
+    socket,
+    setTurnTimerKey,
+    gameStarted,
+    playerId
+) => {
+    console.log('handleTurnTimeout called with:', {
+        gameId,
+        currentPlayer,
+        playerId,
+        gameStarted
+    });
+
+    if (!gameStarted || !socket) {
+        console.log('Game not started or socket not available');
+        return;
+    }
+
+    console.log('Checking if current player turn:', {
+        currentPlayerIndex: players[currentPlayer]?.playerId,
+        playerId
+    });
+
+    if (players[currentPlayer]?.playerId != playerId) {
+        console.log('Handling pass for player timeout');
+        
+        // Create a new board state removing any unplayed tiles
+        const newBoard = [...board];
+        const newRack = [...players[currentPlayer].rack];
+        let tilesReturned = false;
+
+        // Remove unplayed tiles and return them to the player's rack
+        for (let i = 0; i < 15; i++) {
+            for (let j = 0; j < 15; j++) {
+                if (newBoard[i][j].tile && !newBoard[i][j].original) {
+                    console.log('Returning unplayed tile to rack:', newBoard[i][j].tile);
+                    newRack.push(newBoard[i][j].tile);
+                    newBoard[i][j] = { ...newBoard[i][j], tile: null };
+                    tilesReturned = true;
+                }
+            }
+        }
+
+        // Update the state for the current player
+        const updatedPlayers = [...players];
+        updatedPlayers[currentPlayer].rack = newRack;
+
+        console.log('Updating game state and emitting events');
+        
+        // Update local state
+        setBoard(newBoard);
+        setPlayers(updatedPlayers);
+        setSelectedTile(null);
+        setPotentialScore(0);
+        setTurnTimerKey(prev => prev + 1);
+
+        // Emit events to server
+        socket.emit("updateBoard", newBoard);
+        socket.emit("updateRack", {
+            gameId: gameId,
+            playerId: playerId,
+            rack: newRack,
+        });
+        socket.emit("passTurn", {
+            gameId: gameId,
+            currentPlayer: currentPlayer,
+        });
+
+        console.log('Turn timeout handling complete');
+    } else {
+        console.log('It is player\'s turn, ignoring timeout');
+    }
+};
+
   export const handlePass = (
     gameId,
     board,
@@ -196,7 +297,8 @@ import {
     setPlayers,
     setSelectedTile,
     setPotentialScore,
-    socket
+    socket,
+    setTurnTimerKey,
   ) => {
     // Added socket here
     // Ensure socket is available
@@ -238,6 +340,8 @@ import {
       gameId: gameId,
       currentPlayer: currentPlayer, // Send the current player (before the pass)
     });
+
+    setTurnTimerKey((prevKey) => prevKey + 1);
   };
 
   export const handleShuffle = (players, playerId, socket, gameId, setPlayers) => {
@@ -365,30 +469,36 @@ import {
     setSocket,
     SERVER_URL,
     setLastPlayedTiles,
-    setSecondToLastPlayedTiles
+    setSecondToLastPlayedTiles,
+    setIsGameTimerPaused,
+    setIsTurnTimerPaused
 ) => {
-    // Expire the player-id cookie immediately
-    setCookie('player-id', '', 0); // Set expiry to 0 to immediately expire
+    // Set gameStarted to false immediately
+    setGameStarted(false);
+    setGameOver(false);
 
-    if (socketRef.current) {
-        socketRef.current.disconnect(); // Disconnect the current socket
-    }
-
-    // Emit a signal to the server to remove the current game
+    // Emit a signal to the server to remove the current game using the old socket
     if (gameId && socketRef.current) {
         socketRef.current.emit('removeGame', gameId);
     }
 
-    // Reset the game state
+    // Expire the player-id cookie immediately
+    setCookie('player-id', '', 0);
+
+    if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+    }
+
+    // Reset all game states
     setBoard(createEmptyBoard());
     setPlayers([
         { score: 0, rack: [], socketId: null },
         { score: 0, rack: [], socketId: null }
     ]);
     setCurrentPlayer(0);
-    setBag(createTileBag());
+    setBag([]);
     setSelectedTile(null);
-    setGameStarted(false); // Set gameStarted to false initially
     setError('');
     setPotentialScore(0);
     setShowBlankTileModal(false);
@@ -396,213 +506,217 @@ import {
     setTurnEndScore(0);
     setShowStarEffects(false);
     setPlayEndTurnAudio(false);
-    setGameOver(false);
     setLastPlayedTiles([]);
     setSecondToLastPlayedTiles([]);
+    setIsGameTimerPaused(true);
+    setIsTurnTimerPaused(true);
 
-    // Reconnect to the server
+    // Create new player ID and reconnect
+    const newPlayerId = Math.random().toString(36).substr(2, 9);
+    setCookie("player-id", newPlayerId, 365);
+
     const newSocket = io(SERVER_URL);
-    setSocket(newSocket);
-    socketRef.current = newSocket; // Update the ref
-
-    const playerId = getCookie('player-id');
-
-    newSocket.on('connect', () => {
-        if (playerId) {
-            newSocket.emit('joinGame', playerId);
-        }
+    newSocket.on("connect", () => {
+        console.log("New socket connected, emitting joinGame for", newPlayerId);
+        newSocket.emit("joinGame", newPlayerId);
     });
+
+    setSocket(newSocket);
+    socketRef.current = newSocket;
 };
 
-    export const handlePlayWord = async (
-        gameId,
-        board,
-        players,
-        currentPlayer,
-        bag,
-        socket,
-        setTurnEndScore,
-        setShowStarEffects,
-        setPlayEndTurnAudio,
-        setCurrentPlayer,
-        setSelectedTile,
-        setPotentialScore,
-        setBag,
-        setBoard,
-        setPlayers,
-        setLastPlayedTiles,
-        setSecondToLastPlayedTiles,
-        lastPlayedTiles
-      ) => {
-        const playedTiles = [];
-        for (let i = 0; i < 15; i++) {
-          for (let j = 0; j < 15; j++) {
-            if (board[i][j].tile && !board[i][j].original) {
+export const handlePlayWord = async (
+  gameId,
+  board,
+  players,
+  currentPlayer,
+  bag,
+  socket,
+  setTurnEndScore,
+  setShowStarEffects,
+  setPlayEndTurnAudio,
+  setCurrentPlayer,
+  setSelectedTile,
+  setPotentialScore,
+  setBag,
+  setBoard,
+  setPlayers,
+  setLastPlayedTiles,
+  setSecondToLastPlayedTiles,
+  lastPlayedTiles,
+  setTurnTimerKey
+) => {
+  const playedTiles = [];
+  for (let i = 0; i < 15; i++) {
+      for (let j = 0; j < 15; j++) {
+          if (board[i][j].tile && !board[i][j].original) {
               playedTiles.push({ row: i, col: j, tile: board[i][j].tile });
-            }
           }
-        }
-    
-        if (playedTiles.length === 0) {
-          alert("No tiles have been played.");
-          return;
-        }
-    
-        const isHorizontal =
-          playedTiles.length === 1 ||
-          playedTiles.every((tile) => tile.row === playedTiles[0].row);
-        const isVertical =
-          playedTiles.length === 1 ||
-          playedTiles.every((tile) => tile.col === playedTiles[0].col);
-    
-        if (!isHorizontal && !isVertical) {
-          alert("Invalid word placement. Tiles must be in a straight line.");
-          return;
-        }
-    
-        playedTiles.sort((a, b) => (isHorizontal ? a.col - b.col : a.row - b.row));
-    
-        let allWords = [];
-        let totalScore = 0;
-    
-        const addWordAndScore = (newWord, tiles) => {
-          if (newWord.length > 1) {
-            allWords.push(newWord);
-            totalScore += calculateScore(tiles, board);
-          }
-        };
-    
-        const processWord = (currentRow, currentCol, isMainWord = false) => {
-          let tempWord = "";
-          let tempTiles = [];
-          let i = currentRow;
-          let j = currentCol;
-    
-          if (isMainWord) {
-            if (isHorizontal) {
-              while (j >= 0 && board[i][j].tile) {
-                j--;
-              }
-              j++;
-              while (j < 15 && board[i][j].tile) {
-                tempWord += board[i][j].tile;
-                tempTiles.push({ row: i, col: j, tile: board[i][j].tile });
-                j++;
-              }
-            } else {
-              while (i >= 0 && board[i][j].tile) {
-                i--;
-              }
-              i++;
-              while (i < 15 && board[i][j].tile) {
-                tempWord += board[i][j].tile;
-                tempTiles.push({ row: i, col: j, tile: board[i][j].tile });
-                i++;
-              }
-            }
-          } else {
-            if (!isHorizontal) {
-              while (j >= 0 && board[i][j].tile) {
-                j--;
-              }
-              j++;
-              while (j < 15 && board[i][j].tile) {
-                tempWord += board[i][j].tile;
-                tempTiles.push({ row: i, col: j, tile: board[i][j].tile });
-                j++;
-              }
-            } else {
-              while (i >= 0 && board[i][j].tile) {
-                i--;
-              }
-              i++;
-              while (i < 15 && board[i][j].tile) {
-                tempWord += board[i][j].tile;
-                tempTiles.push({ row: i, col: j, tile: board[i][j].tile });
-                i++;
-              }
-            }
-          }
-    
-          if (tempWord.length > 1) {
-            addWordAndScore(tempWord, tempTiles);
-          }
-        };
-    
-        let [startRow, startCol] = [playedTiles[0].row, playedTiles[0].col];
-        processWord(startRow, startCol, true);
-    
-        for (let tile of playedTiles) {
+      }
+  }
+
+  if (playedTiles.length === 0) {
+      alert("No tiles have been played.");
+      return;
+  }
+
+  const isHorizontal =
+      playedTiles.length === 1 ||
+      playedTiles.every((tile) => tile.row === playedTiles[0].row);
+  const isVertical =
+      playedTiles.length === 1 ||
+      playedTiles.every((tile) => tile.col === playedTiles[0].col);
+
+  if (!isHorizontal && !isVertical) {
+      alert("Invalid word placement. Tiles must be in a straight line.");
+      return;
+  }
+
+  playedTiles.sort((a, b) => (isHorizontal ? a.col - b.col : a.row - b.row));
+
+  let allWords = [];
+  let totalScore = 0;
+
+  const addWordAndScore = (newWord, tiles) => {
+      if (newWord.length > 1) {
+          allWords.push(newWord);
+          totalScore += calculateScore(tiles, board);
+      }
+  };
+
+  const processWord = (currentRow, currentCol, isMainWord = false) => {
+      let tempWord = "";
+      let tempTiles = [];
+      let i = currentRow;
+      let j = currentCol;
+
+      if (isMainWord) {
           if (isHorizontal) {
-            processWord(tile.row, tile.col, false);
+              while (j >= 0 && board[i][j].tile) {
+                  j--;
+              }
+              j++;
+              while (j < 15 && board[i][j].tile) {
+                  tempWord += board[i][j].tile;
+                  tempTiles.push({ row: i, col: j, tile: board[i][j].tile });
+                  j++;
+              }
           } else {
-            processWord(tile.row, tile.col, false);
+              while (i >= 0 && board[i][j].tile) {
+                  i--;
+              }
+              i++;
+              while (i < 15 && board[i][j].tile) {
+                  tempWord += board[i][j].tile;
+                  tempTiles.push({ row: i, col: j, tile: board[i][j].tile });
+                  i++;
+              }
           }
-        }
-    
-        for (let word of allWords) {
-          if (!(await isValidWord(word, board))) {
-            alert(`Invalid word: "${word}"`);
-            return;
+      } else {
+          if (!isHorizontal) {
+              while (j >= 0 && board[i][j].tile) {
+                  j--;
+              }
+              j++;
+              while (j < 15 && board[i][j].tile) {
+                  tempWord += board[i][j].tile;
+                  tempTiles.push({ row: i, col: j, tile: board[i][j].tile });
+                  j++;
+              }
+          } else {
+              while (i >= 0 && board[i][j].tile) {
+                  i--;
+              }
+              i++;
+              while (i < 15 && board[i][j].tile) {
+                  tempWord += board[i][j].tile;
+                  tempTiles.push({ row: i, col: j, tile: board[i][j].tile });
+                  i++;
+              }
           }
-        }
-    
-        const newBoard = board.map((row) =>
-          row.map((cell) => ({
-            ...cell,
-            original: cell.original || cell.tile !== null,
-          }))
-        );
-    
-        // Set the turn end score
-        setTurnEndScore(totalScore);
-    
-        // Trigger star effects and audio
-        setShowStarEffects(true);
-        setPlayEndTurnAudio(true);
-    
-        // Store the previous last played tiles before updating
-        setSecondToLastPlayedTiles(lastPlayedTiles);
-    
-        // Update the last played tiles
-        setLastPlayedTiles(playedTiles);
-    
-        // Delay for star animation and then switch to the next player
-        setTimeout(() => {
-          setShowStarEffects(false); // Hide star effects
-          const nextPlayer = (currentPlayer + 1) % 2;
-          // setCurrentPlayer(nextPlayer);
-          setSelectedTile(null);
-          setPotentialScore(0);
-    
-          // Update the player's rack locally before sending the update
-          let updatedPlayers = [...players];
-          const tilesToDraw = Math.max(
-            0,
-            7 - updatedPlayers[currentPlayer].rack.length
-          );
-          const newTiles = drawTiles(bag, tilesToDraw);
-    
-          updatedPlayers[currentPlayer].rack = [
-            ...updatedPlayers[currentPlayer].rack,
-            ...newTiles,
-          ];
-          updatedPlayers[currentPlayer].score += totalScore;
-    
-          setPlayers(updatedPlayers);
-          setBag(bag.filter((tile) => !newTiles.includes(tile)));
-          setBoard(newBoard);
-    
-          // Update the game state on the server
-          socket.emit("playWord", {
-            gameId: gameId,
-            board: newBoard,
-            players: updatedPlayers,
-            currentPlayer: currentPlayer, // Send the current player, not the next player
-            bag: bag.filter((tile) => !newTiles.includes(tile)),
-            newTiles: newTiles, // Send new tiles drawn for the current player
-            lastPlayedTiles: playedTiles,
-            secondToLastPlayedTiles: lastPlayedTiles
-          });
-        }, 1500);
-      };
+      }
+
+      if (tempWord.length > 1) {
+          addWordAndScore(tempWord, tempTiles);
+      }
+  };
+
+  let [startRow, startCol] = [playedTiles[0].row, playedTiles[0].col];
+  processWord(startRow, startCol, true);
+
+  for (let tile of playedTiles) {
+      if (isHorizontal) {
+          processWord(tile.row, tile.col, false);
+      } else {
+          processWord(tile.row, tile.col, false);
+      }
+  }
+
+  for (let word of allWords) {
+      if (!(await isValidWord(word, board))) {
+          alert(`Invalid word: "${word}"`);
+          return;
+      }
+  }
+
+  const newBoard = board.map((row) =>
+      row.map((cell) => ({
+          ...cell,
+          original: cell.original || cell.tile !== null,
+      }))
+  );
+
+  // Set the turn end score
+  setTurnEndScore(totalScore);
+
+  // Trigger star effects and audio
+  setShowStarEffects(true);
+  setPlayEndTurnAudio(true);
+
+  // Store the previous last played tiles before updating
+  setSecondToLastPlayedTiles(lastPlayedTiles);
+
+  // Update the last played tiles
+  setLastPlayedTiles(playedTiles);
+
+  // Reset the turn timer and increment the key
+  setTurnTimerKey((prevKey) => prevKey + 1);
+
+  // Delay for star animation and then switch to the next player
+  setTimeout(() => {
+      setShowStarEffects(false); // Hide star effects
+      const nextPlayer = (currentPlayer + 1) % 2;
+      setSelectedTile(null);
+      setPotentialScore(0);
+
+      // Update the player's rack locally before sending the update
+      let updatedPlayers = [...players];
+      const tilesToDraw = Math.max(
+          0,
+          7 - updatedPlayers[currentPlayer].rack.length
+      );
+      const newTiles = drawTiles(bag, tilesToDraw);
+
+      updatedPlayers[currentPlayer].rack = [
+          ...updatedPlayers[currentPlayer].rack,
+          ...newTiles,
+      ];
+      updatedPlayers[currentPlayer].score += totalScore;
+
+      setPlayers(updatedPlayers);
+      setBag(bag.filter((tile) => !newTiles.includes(tile)));
+      setBoard(newBoard);
+
+      // Update the game state on the server
+      socket.emit("playWord", {
+          gameId: gameId,
+          board: newBoard,
+          players: updatedPlayers,
+          currentPlayer: currentPlayer, // Send the current player, not the next player
+          bag: bag.filter((tile) => !newTiles.includes(tile)),
+          newTiles: newTiles, // Send new tiles drawn for the current player
+          lastPlayedTiles: playedTiles,
+          secondToLastPlayedTiles: lastPlayedTiles
+      });
+  }, 1500);
+};
