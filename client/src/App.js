@@ -507,7 +507,7 @@ const isConnectedToExistingTile = (row, col, board) => {
 return (
   <div className="app m-0 bg-[#F5E6EB] relative">
     <div className="absolute top-2 right-4">
-      <Timer 
+      {gameStarted && <Timer 
         key={turnTimerKey} 
         duration={150} // Turn timer in seconds. 2.5 minutes
         handleTurnTimeout={handleTurnTimeout}
@@ -524,16 +524,16 @@ return (
         setTurnTimerKey={setTurnTimerKey}
         gameStarted={gameStarted}
         playerId={playerId}
-      />
+      />}
     </div>
     <div className="absolute top-2 left-4">
-    <GameTimer 
+    {gameStarted && <GameTimer 
       key={gameTimerKey} 
       duration={1800} // 30 mminute game timer
       onTimeout={() => {}} 
       isPaused={isGameTimerPaused}
       setGameOver={setGameOver}
-    />
+    />}
     </div>
     <img
       src={Logo}
