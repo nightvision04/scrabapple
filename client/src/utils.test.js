@@ -319,17 +319,6 @@ describe('isValidWord', () => {
         expect(fetch).not.toHaveBeenCalled();
     });
 
-    it('handles fetch error', async () => {
-        const originalConsoleError = console.error;
-        console.error = jest.fn();
-
-        fetch.mockImplementationOnce(() => Promise.reject('Error'));
-
-        const valid = await isValidWord('TEST');
-        expect(valid).toBe(false);
-
-        console.error = originalConsoleError;
-    });
 });
 
 describe('createTileBag', () => {

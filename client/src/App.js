@@ -529,11 +529,10 @@ return (
     </div>
     <div className="absolute top-2 left-4">
     {gameStarted && <GameTimer 
-      key={gameTimerKey} 
-      duration={1800} // 30 mminute game timer
-      onTimeout={() => {}} 
-      isPaused={isGameTimerPaused}
-      setGameOver={setGameOver}
+        key={gameTimerKey} 
+        duration={1800} // 30 minute game timer
+        onTimeout={() => setGameOver(true)} 
+        isPaused={isGameTimerPaused}
     />}
     </div>
     <img

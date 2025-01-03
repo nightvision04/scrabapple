@@ -40,7 +40,9 @@ export const createTileBag = () => {
     return bag;
 };
 
-export const drawTiles = (bag, num) => {
+const drawTiles = (bag, num) => {
+    console.log("=== DrawTiles Operation ===");
+    console.log(`Attempting to draw ${num} tiles from bag of size ${bag.length}`);
     const drawn = [];
     for (let i = 0; i < num; i++) {
         if (bag.length > 0) {
@@ -48,6 +50,11 @@ export const drawTiles = (bag, num) => {
             drawn.push(bag.splice(randomIndex, 1)[0]);
         }
     }
+    console.log("Draw operation complete:", {
+        requestedTiles: num,
+        drawnTiles: drawn,
+        remainingBagSize: bag.length
+    });
     return drawn;
 };
 

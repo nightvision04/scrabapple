@@ -67,7 +67,7 @@ const createTileBag = () => {
         'A': 9, 'B': 2, 'C': 2, 'D': 4, 'E': 12, 'F': 2, 'G': 3,
         'H': 2, 'I': 9, 'J': 1, 'K': 1, 'L': 4, 'M': 2, 'N': 6,
         'O': 8, 'P': 2, 'Q': 1, 'R': 6, 'S': 4, 'T': 6, 'U': 4,
-        'V': 2, 'W': 2, 'X': 1, 'Y': 2, 'Z': 1, '_': 0 // wildcards disaabled for now
+        'V': 2, 'W': 2, 'X': 1, 'Y': 2, 'Z': 1, '_': 2  // Added back wildcards
     };
     // To test a fast gamme, use this instead
     // const distribution = {
@@ -87,7 +87,8 @@ const createTileBag = () => {
 };
 
 const drawTiles = (bag, num) => {
-    console.log(`drawTiles - drawing ${num} tiles from bag:`, bag);
+    console.log("=== DrawTiles Operation ===");
+    console.log(`Attempting to draw ${num} tiles from bag of size ${bag.length}`);
     const drawn = [];
     for (let i = 0; i < num; i++) {
         if (bag.length > 0) {
@@ -95,22 +96,25 @@ const drawTiles = (bag, num) => {
             drawn.push(bag.splice(randomIndex, 1)[0]);
         }
     }
-    console.log("drawTiles - drawn tiles:", drawn);
-    console.log("drawTiles - returning bag:", bag);
+    console.log("Draw operation complete:", {
+        requestedTiles: num,
+        drawnTiles: drawn,
+        remainingBagSize: bag.length
+    });
     return drawn;
 };
 
 const isValidWord = async (word, board) => {
-    console.log("isValidWord - validating word:", word);
     if (word.length < 2) {
-        console.log("isValidWord - word is less than 2, returning false");
         return false;
     }
 
     try {
         const response = await fetch(`${SERVER_URL}/validate-word/${word.toLowerCase()}`);
+        if (!response.ok) {
+            return false;
+        }
         const data = await response.json();
-        console.log("isValidWord - server response:", data);
         return data.isValid;
     } catch (error) {
         console.error("Error validating word:", error);

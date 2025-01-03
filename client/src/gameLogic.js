@@ -547,6 +547,17 @@ export const handlePlayWord = async (
   setTurnTimerKey,
   setGameOver
 ) => {
+  console.log("=== PlayWord Operation Start ===");
+  console.log("Initial State:", {
+    bagSize: bag.length,
+    player1RackSize: players[0].rack.length,
+    player2RackSize: players[1].rack.length,
+    boardTiles: board.reduce((count, row) => 
+        count + row.reduce((rc, cell) => rc + (cell.tile ? 1 : 0), 0), 0),
+    currentPlayer,
+    currentRack: players[currentPlayer].rack
+  });
+
   const playedTiles = [];
   for (let i = 0; i < 15; i++) {
       for (let j = 0; j < 15; j++) {
@@ -556,11 +567,14 @@ export const handlePlayWord = async (
       }
   }
 
+  console.log("Found played tiles:", playedTiles);
+
   if (playedTiles.length === 0) {
       alert("No tiles have been played.");
       return;
   }
 
+  // [Previous validation code remains unchanged]
   const isHorizontal = playedTiles.length === 1 || playedTiles.every((tile) => tile.row === playedTiles[0].row);
   const isVertical = playedTiles.length === 1 || playedTiles.every((tile) => tile.col === playedTiles[0].col);
 
@@ -596,6 +610,7 @@ export const handlePlayWord = async (
   let allWords = [];
   let totalScore = 0;
 
+  // [Word processing code remains unchanged]
   const addWordAndScore = (newWord, tiles) => {
       if (newWord.length > 1) {
           allWords.push(newWord);
@@ -611,9 +626,7 @@ export const handlePlayWord = async (
 
       if (isMainWord) {
           if (isHorizontal) {
-              while (j >= 0 && board[i][j].tile) {
-                  j--;
-              }
+              while (j >= 0 && board[i][j].tile) j--;
               j++;
               while (j < 15 && board[i][j].tile) {
                   tempWord += board[i][j].tile;
@@ -621,9 +634,7 @@ export const handlePlayWord = async (
                   j++;
               }
           } else {
-              while (i >= 0 && board[i][j].tile) {
-                  i--;
-              }
+              while (i >= 0 && board[i][j].tile) i--;
               i++;
               while (i < 15 && board[i][j].tile) {
                   tempWord += board[i][j].tile;
@@ -633,9 +644,7 @@ export const handlePlayWord = async (
           }
       } else {
           if (!isHorizontal) {
-              while (j >= 0 && board[i][j].tile) {
-                  j--;
-              }
+              while (j >= 0 && board[i][j].tile) j--;
               j++;
               while (j < 15 && board[i][j].tile) {
                   tempWord += board[i][j].tile;
@@ -643,9 +652,7 @@ export const handlePlayWord = async (
                   j++;
               }
           } else {
-              while (i >= 0 && board[i][j].tile) {
-                  i--;
-              }
+              while (i >= 0 && board[i][j].tile) i--;
               i++;
               while (i < 15 && board[i][j].tile) {
                   tempWord += board[i][j].tile;
@@ -683,64 +690,120 @@ export const handlePlayWord = async (
       return;
   }
 
-  const newBoard = board.map((row) =>
-      row.map((cell) => ({
+  console.log("=== Before Tile Management ===");
+  console.log("Current state:", {
+    bagSize: bag.length,
+    currentRack: players[currentPlayer].rack,
+    playedTilesCount: playedTiles.length
+  });
+
+  const currentBag = [...bag];
+  const currentRack = [...players[currentPlayer].rack];
+
+  playedTiles.forEach(playedTile => {
+      const tileIndex = currentRack.findIndex(t => t === playedTile.tile);
+      if (tileIndex !== -1) {
+          currentRack.splice(tileIndex, 1);
+      }
+  });
+
+  console.log("=== After Removing Tiles ===");
+  console.log("State after removal:", {
+    rackAfterRemoval: currentRack,
+    remainingRackSize: currentRack.length,
+    tilesRemoved: players[currentPlayer].rack.length - currentRack.length
+  });
+
+  const tilesToDraw = Math.min(7 - currentRack.length, currentBag.length);
+  const newTiles = [];
+  
+  console.log("=== Before Drawing Tiles ===");
+  console.log("Draw state:", {
+    tilesToDraw,
+    currentBagSize: currentBag.length,
+    currentRackSize: currentRack.length
+  });
+
+  for (let i = 0; i < tilesToDraw; i++) {
+      const randomIndex = Math.floor(Math.random() * currentBag.length);
+      const drawnTile = currentBag.splice(randomIndex, 1)[0];
+      if (drawnTile) {
+          newTiles.push(drawnTile);
+      }
+  }
+
+  console.log("=== After Drawing Tiles ===");
+  console.log("Draw results:", {
+    drawnTiles: newTiles,
+    newBagSize: currentBag.length,
+    finalRackSize: currentRack.length + newTiles.length
+  });
+
+  const newBoard = board.map(row => 
+      row.map(cell => ({
           ...cell,
           original: cell.original || cell.tile !== null,
       }))
   );
 
-  // Set the turn end score
   setTurnEndScore(totalScore);
-
-  // Trigger star effects and audio
   setShowStarEffects(true);
   setPlayEndTurnAudio(true);
-
-  // Store the previous last played tiles before updating
   setSecondToLastPlayedTiles(lastPlayedTiles);
   setLastPlayedTiles(playedTiles);
-
-  // Reset the turn timer and increment the key
-  setTurnTimerKey((prevKey) => prevKey + 1);
+  setTurnTimerKey(prev => prev + 1);
 
   setTimeout(() => {
       setShowStarEffects(false);
-      const nextPlayer = (currentPlayer + 1) % 2;
       setSelectedTile(null);
       setPotentialScore(0);
 
-      let updatedPlayers = [...players];
-      const tilesToDraw = Math.max(0, 7 - updatedPlayers[currentPlayer].rack.length);
-      const newTiles = drawTiles(bag, tilesToDraw);
-
-      updatedPlayers[currentPlayer].rack = [...updatedPlayers[currentPlayer].rack, ...newTiles];
-      updatedPlayers[currentPlayer].score += totalScore;
-
-      // Check for game end condition and calculate final scores
-      if (bag.length === 0 && (updatedPlayers[0].rack.length === 0 || updatedPlayers[1].rack.length === 0)) {
-          // Calculate and apply deductions for remaining tiles
-          updatedPlayers = updatedPlayers.map(player => {
-              const deduction = player.rack.reduce((sum, tile) => sum + LETTER_VALUES[tile], 0);
+      const updatedPlayers = players.map((player, index) => {
+          if (index === currentPlayer) {
               return {
                   ...player,
-                  score: player.score - deduction
+                  rack: [...currentRack, ...newTiles],
+                  score: player.score + totalScore
               };
-          });
+          }
+          return player;
+      });
+
+      if (currentBag.length === 0 && (updatedPlayers[0].rack.length === 0 || updatedPlayers[1].rack.length === 0)) {
+          const finalPlayers = updatedPlayers.map(player => ({
+              ...player,
+              score: player.score - player.rack.reduce((sum, tile) => sum + LETTER_VALUES[tile], 0)
+          }));
           setGameOver(true);
+          setPlayers(finalPlayers);
+      } else {
+          setPlayers(updatedPlayers);
       }
 
-      setPlayers(updatedPlayers);
-      setBag(bag.filter((tile) => !newTiles.includes(tile)));
+      setBag(currentBag);
       setBoard(newBoard);
 
+      console.log("=== PlayWord Operation End ===");
+      console.log("Final State:", {
+        bagSize: currentBag.length,
+        player1RackSize: updatedPlayers[0].rack.length,
+        player2RackSize: updatedPlayers[1].rack.length,
+        boardTiles: newBoard.reduce((count, row) => 
+            count + row.reduce((rc, cell) => rc + (cell.tile ? 1 : 0), 0), 0),
+        totalTilesInGame: currentBag.length + 
+            updatedPlayers[0].rack.length + 
+            updatedPlayers[1].rack.length +
+            newBoard.reduce((count, row) => 
+                count + row.reduce((rc, cell) => rc + (cell.tile ? 1 : 0), 0), 0)
+      });
+
       socket.emit("playWord", {
-          gameId: gameId,
+          gameId,
           board: newBoard,
           players: updatedPlayers,
-          currentPlayer: currentPlayer,
-          bag: bag.filter((tile) => !newTiles.includes(tile)),
-          newTiles: newTiles,
+          currentPlayer,
+          bag: currentBag,
+          newTiles,
           lastPlayedTiles: playedTiles,
           secondToLastPlayedTiles: lastPlayedTiles
       });
