@@ -13,6 +13,7 @@ const {
     matchPlayers,
     updateGame,
     activeGames,
+    getGameStats,
 } = require("./gameManager");
 const { drawTiles, calculateScore } = require("./server-utils");
 
