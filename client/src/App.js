@@ -552,8 +552,8 @@ return (
         <div
           className={
             isCurrentPlayerTurn()
-              ? "font-bold text-sm my-2"
-              : "text-sm my-2"
+              ? "font-bold text-sm my-1"
+              : "text-sm my-1"
           }
         >
           {isCurrentPlayerTurn()

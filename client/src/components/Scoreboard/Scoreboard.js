@@ -2,7 +2,7 @@ import React from 'react';
 
 const Scoreboard = ({ players, currentPlayer }) => {
     return (
-        <div className="flex justify-center gap-8 p-2 mb-2 bg-white rounded-lg shadow">
+        <div className="flex justify-center gap-8 p-1 mb-2 bg-white rounded-lg shadow">
             {players.map((player, index) => (
                 <div 
                     key={index} 

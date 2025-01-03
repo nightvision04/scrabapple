@@ -40,7 +40,7 @@ const Board = ({
   };
 
   return (
-    <div className="w-full max-w-4xl sm:max-w-[620px] mx-auto p-0 -mb-3 mt-2">
+    <div className="w-full max-w-4xl sm:max-w-[620px] mx-auto p-0 -mb-3 mt-0">
       <div className="aspect-square w-full">
         <div
           role="grid"
