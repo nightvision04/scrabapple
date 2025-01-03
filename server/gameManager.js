@@ -3,6 +3,13 @@ const { createEmptyBoard, createTileBag, drawTiles } = require('./server-utils')
 // Initialize activeGames as an empty object
 const activeGames = {};
 const playerQueue = [];
+let onlinePlayers = new Set();
+let waitTimeStats = {
+    totalWaitTime: 0,
+    matchCount: 0
+};
+
+const joinTimes = new Map();
 
 const generateGameId = () => {
     return Math.random().toString(36).substr(2, 9);
@@ -42,6 +49,9 @@ const removeGame = (gameId) => {
 
 const addPlayerToQueue = (playerId) => {
     console.log('Adding player to queue:', playerId);
+    onlinePlayers.add(playerId);
+    joinTimes.set(playerId, Date.now());
+    
     if (!playerQueue.includes(playerId)) {
         playerQueue.push(playerId);
         console.log('Player added to queue:', playerId);
@@ -53,6 +63,9 @@ const addPlayerToQueue = (playerId) => {
 
 const removePlayerFromQueue = (playerId) => {
     console.log('Removing player from queue:', playerId);
+    onlinePlayers.delete(playerId);
+    joinTimes.delete(playerId);
+    
     const index = playerQueue.indexOf(playerId);
     if (index > -1) {
         playerQueue.splice(index, 1);
@@ -67,6 +80,19 @@ const matchPlayers = () => {
     if (playerQueue.length >= 2) {
         const player1 = playerQueue.shift();
         const player2 = playerQueue.shift();
+        
+        // Calculate wait times and update statistics
+        const now = Date.now();
+        const player1WaitTime = (now - joinTimes.get(player1)) / 1000; // Convert to seconds
+        const player2WaitTime = (now - joinTimes.get(player2)) / 1000;
+        
+        waitTimeStats.totalWaitTime += (player1WaitTime + player2WaitTime);
+        waitTimeStats.matchCount += 2;
+        
+        // Clean up join times
+        joinTimes.delete(player1);
+        joinTimes.delete(player2);
+        
         console.log('Matched players:', player1, player2);
         const gameId = createNewGame(player1, player2);
         return { gameId, player1, player2 };
@@ -85,6 +111,15 @@ const updateGame = (gameId, updatedGame) => {
     }
 };
 
+const getGameStats = () => {
+    return {
+        onlinePlayerCount: onlinePlayers.size,
+        averageWaitTime: waitTimeStats.matchCount > 0 
+            ? Math.round(waitTimeStats.totalWaitTime / waitTimeStats.matchCount)
+            : 0
+    };
+};
+
 module.exports = {
     getGame,
     removeGame,
@@ -92,5 +127,6 @@ module.exports = {
     removePlayerFromQueue,
     matchPlayers,
     updateGame,
-    activeGames
+    activeGames,
+    getGameStats
 };

@@ -469,6 +469,11 @@ io.on("connection", (socket) => {
     });
 });
 
+setInterval(() => {
+    const stats = getGameStats();
+    io.emit('gameStats', stats);
+}, 5000); // Update every 5 seconds
+
 // Bind server to 0.0.0.0 to listen on all interfaces
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`Server listening on port ${PORT}`);
