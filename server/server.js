@@ -14,7 +14,7 @@ const {
     updateGame,
     activeGames,
 } = require("./gameManager");
-const { drawTiles, calculateScore, createTileBag, createEmptyBoard } = require("./server-utils");
+const { drawTiles, calculateScore } = require("./server-utils");
 
 const app = express();
 const server = http.createServer(app);
@@ -234,32 +234,85 @@ io.on("connection", (socket) => {
 
     socket.on("playWord", (data) => {
         console.log("playWord - Received playWord event");
-        const { gameId, board, players, currentPlayer, bag, newTiles, lastPlayedTiles, secondToLastPlayedTiles } = data;
-
+        const { gameId, board, players, currentPlayer, bag, newTiles, lastPlayedTiles } = data;
+    
+        console.log("playWord - gameId:", gameId);
+        console.log("playWord - players:", players);
+        console.log("playWord - currentPlayer:", currentPlayer);
+        console.log("playWord - bag:", bag);
+        console.log("playWord - newTiles:", newTiles);
+        console.log("playWord - lastPlayedTiles:", lastPlayedTiles);
+    
         const game = getGame(gameId);
         if (game) {
             const nextPlayer = (currentPlayer + 1) % 2;
-
-            // Calculate the score for the played word
             const wordScore = calculateScore(lastPlayedTiles, board);
-
-            // Create an updated players array with the new score
+    
+            // Use the game's current state for the player's rack
+            const currentRack = [...game.players[currentPlayer].rack];
+            console.log("playWord - Current game rack state:", currentRack);
+    
+            // Pre-update validation
+            const initialTotalTiles = countTotalTiles(game.bag, game.players, game.board);
+            console.log("playWord - Initial total tiles:", initialTotalTiles);
+    
+            // Track removed tiles
+            const removedTiles = [];
+            lastPlayedTiles.forEach(playedTile => {
+                const tileIndex = currentRack.indexOf(playedTile.tile);
+                if (tileIndex !== -1) {
+                    removedTiles.push(currentRack[tileIndex]);
+                    currentRack.splice(tileIndex, 1);
+                } else {
+                    console.error("playWord - Attempted to remove tile not in rack:", playedTile.tile);
+                }
+            });
+            console.log("playWord - Removed tiles:", removedTiles);
+            console.log("playWord - Rack after removing played tiles:", currentRack);
+    
+            // Create updated players array with rack modifications
             const updatedPlayers = game.players.map((player, index) => {
                 if (index === currentPlayer) {
+                    const finalRack = [...currentRack, ...newTiles];
+                    console.log("playWord - Final rack with new tiles:", finalRack);
+                    
                     return {
                         ...player,
-                        rack: player.rack.filter((tile) => {
-                            return !lastPlayedTiles.some((playedTile) => playedTile.tile === tile);
-                        }),
+                        rack: finalRack,
                         score: player.score + wordScore
                     };
                 }
                 return player;
             });
-
-            // Add new tiles to the current player's rack
-            updatedPlayers[currentPlayer].rack.push(...newTiles);
-
+    
+            // Count board tiles after the move
+            let boardTilesCount = 0;
+            board.forEach(row => {
+                row.forEach(cell => {
+                    if (cell.tile) boardTilesCount++;
+                });
+            });
+    
+            // Post-update validation (before committing changes)
+            const expectedTotalTiles = 114; // Known constant
+            const actualTotalTiles = updatedPlayers[currentPlayer].rack.length + 
+                                   updatedPlayers[1 - currentPlayer].rack.length + 
+                                   bag.length + 
+                                   boardTilesCount;
+    
+            if (actualTotalTiles !== expectedTotalTiles) {
+                console.error("playWord - Tile count discrepancy detected:", {
+                    expected: expectedTotalTiles,
+                    actual: actualTotalTiles,
+                    currentPlayerRack: updatedPlayers[currentPlayer].rack.length,
+                    otherPlayerRack: updatedPlayers[1 - currentPlayer].rack.length,
+                    bagSize: bag.length,
+                    boardTiles: boardTilesCount,
+                    removedTiles: removedTiles,
+                    newTiles: newTiles
+                });
+            }
+    
             // Update the game state
             const updatedGame = {
                 ...game,
@@ -270,31 +323,59 @@ io.on("connection", (socket) => {
                 lastPlayedTiles: lastPlayedTiles || [],
                 secondToLastPlayedTiles: game.lastPlayedTiles || [],
             };
-
+    
+            // Final validation after game state update
+            const finalTotalTiles = countTotalTiles(updatedGame.bag, updatedGame.players, updatedGame.board);
+            console.log("playWord - Final total tiles:", finalTotalTiles);
+    
+            if (initialTotalTiles !== finalTotalTiles) {
+                console.error("playWord - Total tiles changed during update:", {
+                    initial: initialTotalTiles,
+                    final: finalTotalTiles,
+                    difference: finalTotalTiles - initialTotalTiles
+                });
+            }
+    
+            console.log("playWord - Updating game");
             updateGame(gameId, updatedGame);
-
-            // Send gameUpdate to the current player with newTiles information
+    
+            // Send game updates to players
             io.to(game.players[currentPlayer].socketId).emit("gameUpdate", {
                 ...updatedGame,
                 newTiles,
             });
-
-            // Send gameUpdate to the other player *without* newTiles information
+    
             io.to(gameId).except(game.players[currentPlayer].socketId).emit("gameUpdate", {
                 ...updatedGame,
             });
-
+    
             io.to(gameId).emit("turnUpdate", nextPlayer);
             console.log(
                 `playWord - [Game ${gameId}] Word played by player: ${game.players[currentPlayer].playerId}, score: ${wordScore}, next turn: ${game.players[nextPlayer].playerId}`
             );
-
-            console.log("playWord - Calculating total tiles after word played.");
-            calculateTotalTiles(updatedGame);
+    
+            console.log("playWord - Final tile distribution:", {
+                bagSize: updatedGame.bag.length,
+                player1RackSize: updatedGame.players[0].rack.length,
+                player2RackSize: updatedGame.players[1].rack.length,
+                boardTiles: boardTilesCount
+            });
         } else {
             console.error("playWord - Error: Could not find game:", gameId);
         }
     });
+    
+    // Helper function to count total tiles in the game
+    function countTotalTiles(bag, players, board) {
+        let total = bag.length;
+        players.forEach(player => total += player.rack.length);
+        board.forEach(row => {
+            row.forEach(cell => {
+                if (cell.tile) total++;
+            });
+        });
+        return total;
+    }
 
     socket.on("exchangeTile", (data) => {
         console.log("exchangeTile - Exchanging tile:", data);
@@ -333,7 +414,6 @@ io.on("connection", (socket) => {
         if (game) {
             const nextPlayer = (currentPlayer + 1) % 2;
             game.currentPlayer = nextPlayer;
-            game.turnEndTime = Date.now() + (150 * 1000); // Reset turn timer
 
             updateGame(gameId, game);
             io.to(gameId).emit("gameUpdate", game);
@@ -385,38 +465,6 @@ io.on("connection", (socket) => {
         console.log("Client disconnected:", socket.id);
         if (socket.playerId) {
             removePlayerFromQueue(socket.playerId);
-        }
-    });
-
-    socket.on("timeUpdate", ({ gameId, timeLeft }) => {
-        // Broadcast time update to all players in the game except sender
-        socket.to(gameId).emit("timeUpdate", { timeLeft });
-    });
-
-    socket.on("requestTurnEndTime", ({ gameId }) => {
-        console.log("requestTurnEndTime - Turn end time requested for game:", gameId);
-        const game = getGame(gameId);
-        if (game) {
-            // If no end time exists or we're starting a new turn, create a new end time
-            if (!game.turnEndTime || game.turnEndTime < Date.now()) {
-                game.turnEndTime = Date.now() + (150 * 1000); // 2.5 minutes
-                updateGame(gameId, game);
-            }
-            console.log("requestTurnEndTime - Sending turn end time:", game.turnEndTime);
-            io.in(gameId).emit("turnEndTime", { endTime: game.turnEndTime });
-        }
-    });
-
-    socket.on("requestGameEndTime", ({ gameId }) => {
-        console.log("requestGameEndTime - Game end time requested for game:", gameId);
-        const game = getGame(gameId);
-        if (game) {
-            // If no end time exists, create one
-            if (!game.gameEndTime) {
-                game.gameEndTime = Date.now() + (1800 * 1000); // 30 minutes in milliseconds
-            }
-            console.log("requestGameEndTime - Sending game end time:", game.gameEndTime);
-            socket.emit("gameEndTime", { endTime: game.gameEndTime });
         }
     });
 });
