@@ -20,8 +20,8 @@ const BOARD_BONUSES = {
     '1,1': 'dw', '2,2': 'dw', '3,3': 'dw',
     '4,4': 'dw', '10,10': 'dw', '11,11': 'dw',
     '12,12': 'dw', '13,13': 'dw', '1,13': 'dw',
-    '2,12': 'dw', '3,11': 'dw', '4,10': 'dw', 
-    '10,4': 'dw', '11,3': 'dw', '12,2': 'dw', 
+    '2,12': 'dw', '3,11': 'dw', '4,10': 'dw',
+    '10,4': 'dw', '11,3': 'dw', '12,2': 'dw',
     '13,1': 'dw',
     '1,5': 'dl', '1,9': 'dl', '5,1': 'dl',
     '5,5': 'dl', '5,9': 'dl', '5,13': 'dl',
@@ -37,7 +37,6 @@ const BOARD_BONUSES = {
     '12,8': 'tl', '14,3': 'tl', '14,11': 'tl'
 };
 
-
 // If theres a problem client side with creating the board (like a bunch of bonnuses all on
 // the same line, then use this logic instead. its working)
 const createEmptyBoard = () => {
@@ -47,7 +46,7 @@ const createEmptyBoard = () => {
         board[i] = [];
         for (let j = 0; j < 15; j++) {
             // Correctly initialize each cell as a new object
-            board[i][j] = { tile: null, bonus: null }; 
+            board[i][j] = { tile: null, bonus: null };
         }
     }
 
@@ -63,6 +62,7 @@ const createEmptyBoard = () => {
 
 // This counts how many of each letter exist in the bag
 const createTileBag = () => {
+    console.log("createTileBag - creating tile bag");
     const distribution = {
         'A': 9, 'B': 2, 'C': 2, 'D': 4, 'E': 12, 'F': 2, 'G': 3,
         'H': 2, 'I': 9, 'J': 1, 'K': 1, 'L': 4, 'M': 2, 'N': 6,
@@ -82,10 +82,12 @@ const createTileBag = () => {
             bag.push(letter);
         }
     }
+    console.log("createTileBag - returning bag", bag);
     return bag;
 };
 
 const drawTiles = (bag, num) => {
+    console.log(`drawTiles - drawing ${num} tiles from bag:`, bag);
     const drawn = [];
     for (let i = 0; i < num; i++) {
         if (bag.length > 0) {
@@ -93,17 +95,22 @@ const drawTiles = (bag, num) => {
             drawn.push(bag.splice(randomIndex, 1)[0]);
         }
     }
+    console.log("drawTiles - drawn tiles:", drawn);
+    console.log("drawTiles - returning bag:", bag);
     return drawn;
 };
 
 const isValidWord = async (word, board) => {
+    console.log("isValidWord - validating word:", word);
     if (word.length < 2) {
+        console.log("isValidWord - word is less than 2, returning false");
         return false;
     }
 
     try {
         const response = await fetch(`${SERVER_URL}/validate-word/${word.toLowerCase()}`);
         const data = await response.json();
+        console.log("isValidWord - server response:", data);
         return data.isValid;
     } catch (error) {
         console.error("Error validating word:", error);
@@ -112,15 +119,19 @@ const isValidWord = async (word, board) => {
 };
 
 const calculateWordScore = (board, playedTiles, tiles) => {
+    console.log("calculateWordScore - calculating score for tiles:", tiles);
     if (!tiles || !playedTiles) {
+        console.log("calculateWordScore - no tiles or playedTiles, returning 0");
         return 0;
     }
 
     let wordScore = 0;
     let wordMultiplier = 1;
     const newlyPlayedTiles = new Set(playedTiles.map(tile => `${tile.row},${tile.col}`));
+    console.log("calculateWordScore - newlyPlayedTiles:", newlyPlayedTiles);
 
     if (!tiles.some(t => newlyPlayedTiles.has(`${t.row},${t.col}`))) {
+        console.log("calculateWordScore - no new tiles in word, returning 0");
         return 0;
     }
 
@@ -128,6 +139,7 @@ const calculateWordScore = (board, playedTiles, tiles) => {
         const { row, col, tile: letter } = tile;
         const letterValue = LETTER_VALUES[letter] || 0;
         let tileScore = letterValue;
+        console.log(`calculateWordScore - calculating for tile ${letter} at ${row},${col}`);
 
         if (newlyPlayedTiles.has(`${row},${col}`)) {
             const bonus = board[row][col]?.bonus;
@@ -135,15 +147,19 @@ const calculateWordScore = (board, playedTiles, tiles) => {
             else if (bonus === 'tl') tileScore *= 3;
             else if (bonus === 'dw') wordMultiplier *= 2;
             else if (bonus === 'tw') wordMultiplier *= 3;
+            console.log(`calculateWordScore - applying bonus ${bonus}, tileScore ${tileScore}, wordMultiplier ${wordMultiplier}`);
         }
 
         wordScore += tileScore;
     }
 
+    console.log("calculateWordScore - wordScore before multiplier:", wordScore);
+    console.log("calculateWordScore - returning score:", wordScore * wordMultiplier);
     return wordScore * wordMultiplier;
 };
 
 const getWordTiles = (board, startRow, startCol, isHorizontal) => {
+    console.log(`getWordTiles - getting word tiles starting at ${startRow},${startCol}, isHorizontal: ${isHorizontal}`);
     let tiles = [];
     let row = startRow;
     let col = startCol;
@@ -160,13 +176,15 @@ const getWordTiles = (board, startRow, startCol, isHorizontal) => {
         isHorizontal ? col++ : row++;
     }
 
+    console.log("getWordTiles - returning tiles:", tiles);
     return tiles;
 };
 
 const getAllRelevantWords = (playedTiles, board) => {
+    console.log("getAllRelevantWords - getting all relevant words for playedTiles:", playedTiles);
     const isHorizontal = determineWordDirection(playedTiles, board);
     const words = [];
-    
+
     const mainWordTiles = getWordTiles(board, playedTiles[0].row, playedTiles[0].col, isHorizontal);
     words.push(mainWordTiles);
 
@@ -177,11 +195,12 @@ const getAllRelevantWords = (playedTiles, board) => {
         }
     }
 
+    console.log("getAllRelevantWords - returning words:", words);
     return words;
 };
 
-
 const determineWordDirection = (playedTiles, board) => {
+    console.log("determineWordDirection - determining direction for playedTiles:", playedTiles);
     const tile = playedTiles[0];
     // Check for adjacent tiles above/below
     const hasVerticalNeighbors = (
@@ -193,37 +212,48 @@ const determineWordDirection = (playedTiles, board) => {
         (tile.col > 0 && board[tile.row][tile.col - 1]?.tile) ||
         (tile.col < 14 && board[tile.row][tile.col + 1]?.tile)
     );
-    
+
     if (playedTiles.length === 1) {
         // For single tile plays, check existing connections
+        console.log("determineWordDirection - single tile played, returning", hasVerticalNeighbors && !hasHorizontalNeighbors ? false : true);
         return hasVerticalNeighbors && !hasHorizontalNeighbors ? false : true;
     } else {
         // For multiple tiles, compare their positions
+        console.log("determineWordDirection - multiple tiles played, returning", playedTiles[0].row === playedTiles[1].row);
         return playedTiles[0].row === playedTiles[1].row;
     }
 };
 
 const calculateScore = (playedTiles, board) => {
-    if (!playedTiles || playedTiles.length === 0) return 0;
+    console.log("calculateScore - calculating score for playedTiles:", playedTiles);
+    if (!playedTiles || playedTiles.length === 0) {
+        console.log("calculateScore - no played tiles, returning 0");
+        return 0;
+    }
 
     let totalScore = 0;
     const isHorizontal = determineWordDirection(playedTiles, board);
-    
+
     const mainWordTiles = getWordTiles(board, playedTiles[0].row, playedTiles[0].col, isHorizontal);
+    console.log("calculateScore - mainWordTiles:", mainWordTiles);
     totalScore += calculateWordScore(board, playedTiles, mainWordTiles);
 
     for (const tile of playedTiles) {
         const perpendicularWordTiles = getWordTiles(board, tile.row, tile.col, !isHorizontal);
+        console.log(`calculateScore - perpendicularWordTiles for tile ${tile.tile} at ${tile.row},${tile.col}:`, perpendicularWordTiles);
         if (perpendicularWordTiles.length > 1) {
             totalScore += calculateWordScore(board, playedTiles, perpendicularWordTiles);
         }
     }
 
-    if (playedTiles.length === 7) totalScore += 50;
+    if (playedTiles.length === 7) {
+        console.log("calculateScore - adding 50 bonus points for using all tiles");
+        totalScore += 50;
+    }
 
+    console.log("calculateScore - returning totalScore:", totalScore);
     return totalScore;
 };
-
 
 module.exports = {
     createEmptyBoard,
