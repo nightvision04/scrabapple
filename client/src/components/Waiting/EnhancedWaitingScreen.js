@@ -21,7 +21,7 @@ const EnhancedWaiting = ({ onlinePlayers = 0, averageWaitTime = 0 }) => {
   };
 
   return (
-    <div className="min-h-screen w-full mt-7 bg-amber-50 flex flex-col">
+    <div className="min-h-screen w-full mt-7 bg-[#F5E6EB] flex flex-col">
       <div className="flex flex-col items-center pt-6 pb-6">
         <div className="animate-spin rounded-full h-24 w-24 border-b-2 border-amber-900"></div>
         <p className="mt-10 text-lg text-amber-900">Waiting for another player...</p>
@@ -33,8 +33,8 @@ const EnhancedWaiting = ({ onlinePlayers = 0, averageWaitTime = 0 }) => {
           <p className="text-sm text-amber-800">
             Average Wait Time: <span className="font-semibold">{averageWaitTime ? formatWaitTime(averageWaitTime) : 'N/A'}</span>
           </p>
-        
-          <div className="pt-8 pb-3 bg-amber-50 flex flex-col gap-2 sm:flex-row w-full items-center justify-center">
+
+          <div className="pt-8 pb-3 bg-[#F5E6EB] flex flex-col gap-2 sm:flex-row w-full items-center justify-center">
             <input
               type="text"
               value={siteUrl}
@@ -43,9 +43,9 @@ const EnhancedWaiting = ({ onlinePlayers = 0, averageWaitTime = 0 }) => {
             />
             <button
               onClick={handleCopy}
-              className="whitespace-nowrap w-full sm:w-auto px-6 py-2 bg-amber-900 text-white rounded-lg hover:bg-amber-700 transition-colors flex items-center"
+              className="whitespace-nowrap w-full px-6 py-2 bg-amber-900 text-white rounded-lg hover:bg-amber-700 transition-colors flex items-center justify-center"
             >
-              <FaLink className="inline-block mr-2" />
+              <FaLink className="mr-2" />
               {copied ? 'Copied!' : 'Share Link'}
             </button>
           </div>
