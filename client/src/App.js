@@ -32,7 +32,7 @@ import EnhancedWaiting from "./components/Waiting/EnhancedWaitingScreen";
 import Timer from "./components/Timer/Timer";
 import GameTimer from "./components/Timer/GameTimer";
 import StartupScreen from "./components/StartupScreen/StartupScreen";
-
+import { Helmet } from 'react-helmet-async';
 
 function isTouchDevice() {
   return (
@@ -42,7 +42,6 @@ function isTouchDevice() {
   );
 }
 
-
 export const getServerUrl = () => {
   // dev
   if (process.env.REACT_APP_SERVER_URL) {
@@ -51,7 +50,6 @@ export const getServerUrl = () => {
   // prod
   return window.location.origin;
 };
-
 
 function App() {
   const [socket, setSocket] = useState(null);
@@ -517,6 +515,23 @@ const isConnectedToExistingTile = (row, col, board) => {
 
 return (
     <div className="app m-0 bg-[#F5E6EB] relative">
+        <Helmet>
+            <title>Scrabapple - Online Multiplayer Scrabble Game</title>
+            <meta name="description" content="Join Scrabapple for an exciting online Scrabble experience! Play with friends or players worldwide and enhance your word skills." />
+            <meta name="keywords" content="Scrabapple, Scrabble, online game, multiplayer, word game, vocabulary, strategy, board game, crossword" />
+            <meta name="author" content="Daniel Scott" />
+
+            <meta property="og:title" content="Scrabapple - Free Online Multiplayer Scrabble Game" />
+            <meta property="og:description" content="Join Scrabapple for an exciting online Scrabble experience! Play with friends or players worldwide and enhance your word skills." />
+            <meta property="og:image" content="https://www.scrabapple.ca/scrabapple-logo.png" />
+            <meta property="og:url" content="https://www.scrabapple.ca" />
+            <meta property="og:type" content="website" />
+
+            <meta name="twitter:card" content="summary_large_image" />
+            <meta name="twitter:title" content="Scrabapple - Online Multiplayer Scrabble Game" />
+            <meta name="twitter:description" content="Join Scrabapple for an exciting online Scrabble experience! Play with friends or players worldwide and enhance your word skills." />
+            <meta name="twitter:image" content="https://www.scrabapple.ca/scrabapple-logo.png" />
+        </Helmet>
       {showStartup ? (
         <StartupScreen 
         onJoinGame={(name) => {
