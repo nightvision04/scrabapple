@@ -220,25 +220,12 @@ import {
     gameStarted,
     playerId
 ) => {
-    console.log('handleTurnTimeout called with:', {
-        gameId,
-        currentPlayer,
-        playerId,
-        gameStarted
-    });
 
     if (!gameStarted || !socket) {
-        console.log('Game not started or socket not available');
         return;
     }
 
-    console.log('Checking if current player turn:', {
-        currentPlayerIndex: players[currentPlayer]?.playerId,
-        playerId
-    });
-
     if (players[currentPlayer]?.playerId != playerId) {
-        console.log('Handling pass for player timeout');
         
         // Create a new board state removing any unplayed tiles
         const newBoard = [...board];
@@ -249,7 +236,6 @@ import {
         for (let i = 0; i < 15; i++) {
             for (let j = 0; j < 15; j++) {
                 if (newBoard[i][j].tile && !newBoard[i][j].original) {
-                    console.log('Returning unplayed tile to rack:', newBoard[i][j].tile);
                     newRack.push(newBoard[i][j].tile);
                     newBoard[i][j] = { ...newBoard[i][j], tile: null };
                     tilesReturned = true;
@@ -261,8 +247,6 @@ import {
         const updatedPlayers = [...players];
         updatedPlayers[currentPlayer].rack = newRack;
 
-        console.log('Updating game state and emitting events');
-        
         // Update local state
         setBoard(newBoard);
         setPlayers(updatedPlayers);
@@ -282,10 +266,7 @@ import {
             currentPlayer: currentPlayer,
         });
 
-        console.log('Turn timeout handling complete');
-    } else {
-        console.log('It is player\'s turn, ignoring timeout');
-    }
+    } 
 };
 
   export const handlePass = (
@@ -345,17 +326,13 @@ import {
   };
 
   export const handleShuffle = (players, playerId, socket, gameId, setPlayers) => {
-    console.log("handleShuffle - Start");
     if (!socket) {
-        console.error("handleShuffle - Socket is not connected");
         return;
     }
     if (!gameId) {
-        console.error("handleShuffle - gameId is not defined");
         return;
     }
     if (!playerId) {
-        console.error("handleShuffle - playerId is not defined");
         return;
     }
 
@@ -367,14 +344,12 @@ import {
     }
 
     const currentRack = [...player.rack];
-    console.log("handleShuffle - Current Rack Before Shuffle:", currentRack);
 
     // Shuffle the rack
     for (let i = currentRack.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [currentRack[i], currentRack[j]] = [currentRack[j], currentRack[i]];
     }
-    console.log("handleShuffle - Current Rack After Shuffle:", currentRack);
 
     // Update the local state
     const updatedPlayers = players.map(p => 
@@ -385,7 +360,6 @@ import {
 
     // Update the players state
     setPlayers(updatedPlayers);
-    console.log("handleShuffle - Updated Players:", updatedPlayers);
 
     // Emit the shuffleRack event to the server
     socket.emit('shuffleRack', {
@@ -394,7 +368,6 @@ import {
         rack: currentRack
     });
 
-    console.log("handleShuffle - Emitted shuffleRack to server");
 };
 
   export const handleSelectBlankTile = (
@@ -517,7 +490,6 @@ import {
 
     const newSocket = io(SERVER_URL);
     newSocket.on("connect", () => {
-        console.log("New socket connected, emitting joinGame for", newPlayerId);
         newSocket.emit("joinGame", newPlayerId);
     });
 
@@ -547,16 +519,7 @@ export const handlePlayWord = async (
   setTurnTimerKey,
   setGameOver
 ) => {
-  console.log("=== PlayWord Operation Start ===");
-  console.log("Initial State:", {
-    bagSize: bag.length,
-    player1RackSize: players[0].rack.length,
-    player2RackSize: players[1].rack.length,
-    boardTiles: board.reduce((count, row) => 
-        count + row.reduce((rc, cell) => rc + (cell.tile ? 1 : 0), 0), 0),
-    currentPlayer,
-    currentRack: players[currentPlayer].rack
-  });
+
 
   const playedTiles = [];
   for (let i = 0; i < 15; i++) {
@@ -567,7 +530,7 @@ export const handlePlayWord = async (
       }
   }
 
-  console.log("Found played tiles:", playedTiles);
+
 
   if (playedTiles.length === 0) {
       alert("No tiles have been played.");
@@ -690,12 +653,6 @@ export const handlePlayWord = async (
       return;
   }
 
-  console.log("=== Before Tile Management ===");
-  console.log("Current state:", {
-    bagSize: bag.length,
-    currentRack: players[currentPlayer].rack,
-    playedTilesCount: playedTiles.length
-  });
 
   const currentBag = [...bag];
   const currentRack = [...players[currentPlayer].rack];
@@ -707,22 +664,10 @@ export const handlePlayWord = async (
       }
   });
 
-  console.log("=== After Removing Tiles ===");
-  console.log("State after removal:", {
-    rackAfterRemoval: currentRack,
-    remainingRackSize: currentRack.length,
-    tilesRemoved: players[currentPlayer].rack.length - currentRack.length
-  });
 
   const tilesToDraw = Math.min(7 - currentRack.length, currentBag.length);
   const newTiles = [];
-  
-  console.log("=== Before Drawing Tiles ===");
-  console.log("Draw state:", {
-    tilesToDraw,
-    currentBagSize: currentBag.length,
-    currentRackSize: currentRack.length
-  });
+
 
   for (let i = 0; i < tilesToDraw; i++) {
       const randomIndex = Math.floor(Math.random() * currentBag.length);
@@ -732,12 +677,6 @@ export const handlePlayWord = async (
       }
   }
 
-  console.log("=== After Drawing Tiles ===");
-  console.log("Draw results:", {
-    drawnTiles: newTiles,
-    newBagSize: currentBag.length,
-    finalRackSize: currentRack.length + newTiles.length
-  });
 
   const newBoard = board.map(row => 
       row.map(cell => ({
@@ -782,20 +721,6 @@ export const handlePlayWord = async (
 
       setBag(currentBag);
       setBoard(newBoard);
-
-      console.log("=== PlayWord Operation End ===");
-      console.log("Final State:", {
-        bagSize: currentBag.length,
-        player1RackSize: updatedPlayers[0].rack.length,
-        player2RackSize: updatedPlayers[1].rack.length,
-        boardTiles: newBoard.reduce((count, row) => 
-            count + row.reduce((rc, cell) => rc + (cell.tile ? 1 : 0), 0), 0),
-        totalTilesInGame: currentBag.length + 
-            updatedPlayers[0].rack.length + 
-            updatedPlayers[1].rack.length +
-            newBoard.reduce((count, row) => 
-                count + row.reduce((rc, cell) => rc + (cell.tile ? 1 : 0), 0), 0)
-      });
 
       socket.emit("playWord", {
           gameId,

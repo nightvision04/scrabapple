@@ -40,24 +40,6 @@ export const createTileBag = () => {
     return bag;
 };
 
-const drawTiles = (bag, num) => {
-    console.log("=== DrawTiles Operation ===");
-    console.log(`Attempting to draw ${num} tiles from bag of size ${bag.length}`);
-    const drawn = [];
-    for (let i = 0; i < num; i++) {
-        if (bag.length > 0) {
-            const randomIndex = Math.floor(Math.random() * bag.length);
-            drawn.push(bag.splice(randomIndex, 1)[0]);
-        }
-    }
-    console.log("Draw operation complete:", {
-        requestedTiles: num,
-        drawnTiles: drawn,
-        remainingBagSize: bag.length
-    });
-    return drawn;
-};
-
 // Function to validate words using the server-side dictionary
 export const isValidWord = async (word, board) => {
     if (word.length < 2) {

@@ -1,4 +1,3 @@
-// --- File: App.js ---
 import React, { useState, useEffect, useRef } from "react";
 import io from "socket.io-client";
 import { DragDropContext, Droppable } from "react-beautiful-dnd";
@@ -89,7 +88,6 @@ function App() {
 
         const connectSocket = (playerIdToUse) => {
           const serverUrl = getServerUrl();
-          console.log(`NEW SOCKET ${serverUrl}`);
           const newSocket = io(serverUrl);
           socketRef.current = newSocket;
           setSocket(newSocket);
@@ -118,9 +116,6 @@ function App() {
       useEffect(() => {
         if (socket) {
             socket.on("gameUpdate", (gameState) => {
-              console.log("Received gameUpdate:", gameState);
-              console.log("Received gameUpdate board:", gameState.board);
-              console.log("Received currentPlayer in gameUpdate:", gameState.currentPlayer);
 
               if (waitingRetryId) {
                 clearTimeout(waitingRetryId);
@@ -138,11 +133,9 @@ function App() {
 
               setBoard(gameState.board);
               setPlayers(updatedPlayers);
-              console.log("Updated players array:", updatedPlayers);
               setCurrentPlayer(gameState.currentPlayer);
               setBag(gameState.bag);
               setGameStarted(gameState.gameStarted);
-              console.log("Game started:", gameState.gameStarted);
               setGameId(gameState.gameId);
               setSecondToLastPlayedTiles(gameState.secondToLastPlayedTiles || []);
               setLastPlayedTiles(gameState.lastPlayedTiles || []);
@@ -153,7 +146,7 @@ function App() {
                 gameState.currentPlayer ===
                   updatedPlayers.findIndex((p) => p.playerId === playerId)
               ) {
-                console.log("New tiles from gameUpdate:", gameState.newTiles);
+              
                 const playerIndex = updatedPlayers.findIndex(
                   (p) => p.playerId === playerId
                 );
@@ -430,20 +423,6 @@ const isConnectedToExistingTile = (row, col, board) => {
     return players[currentPlayer]?.playerId === playerId;
   };
 
-  console.log("isCurrentPlayerTurn:", isCurrentPlayerTurn());
-  console.log("gameStarted:", gameStarted);
-  console.log("socket:", socketRef.current);
-  console.log("players:", players);
-  console.log("currentPlayer:", currentPlayer);
-  console.log("playerId:", playerId);
-  if (players.length > 0 && players[currentPlayer]) {
-    console.log(
-      "players[currentPlayer].socketId:",
-      players[currentPlayer].socketId
-    );
-  }
-  console.log("socket.id:", socketRef.current ? socketRef.current.id : null);
-
   const backendOptions = {
     enableMouseEvents: true,
   };
@@ -495,7 +474,6 @@ const isConnectedToExistingTile = (row, col, board) => {
 
     const newSocket = io(window.location.origin);
     newSocket.on("connect", () => {
-        console.log("New socket connected, emitting joinGame for", newPlayerId);
         newSocket.emit("joinGame", newPlayerId);
     });
 
@@ -505,7 +483,6 @@ const isConnectedToExistingTile = (row, col, board) => {
     // Set a timeout to retry joining a game if still waiting after a delay
     const retryTimeoutId = setTimeout(() => {
         if (!gameStarted) {
-            console.log("Retrying joinGame...");
             socketRef.current.emit("joinGame", newPlayerId);
         }
     }, 5000);
