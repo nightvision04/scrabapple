@@ -21,7 +21,6 @@ export const createEmptyBoard = () => {
         const [row, col] = coord.split(',').map(Number);
         board[row][col].bonus = BOARD_BONUSES[coord];
     }
-    console.log("createEmptyBoard - board (client side):", board);
     return board;
 };
 

@@ -572,6 +572,28 @@ export const handlePlayWord = async (
       return;
   }
 
+  const isFirstPlay = !board.some(row => row.some(cell => cell.tile && cell.original));
+  const wordPassesThroughCenter = playedTiles.some(tile => tile.row === 7 && tile.col === 7);
+  const isConnectedToExistingWord = playedTiles.some(tile => {
+    const { row, col } = tile;
+    return (
+      (row > 0 && board[row-1][col].tile && board[row-1][col].original) ||
+      (row < 14 && board[row+1][col].tile && board[row+1][col].original) ||
+      (col > 0 && board[row][col-1].tile && board[row][col-1].original) ||
+      (col < 14 && board[row][col+1].tile && board[row][col+1].original)
+    );
+  });
+
+  if (isFirstPlay) {
+    if (!wordPassesThroughCenter) {
+      alert("Invalid word placement - First word needs to connect to the center of the board");
+      return;
+    }
+  } else if (!isConnectedToExistingWord) {
+    alert("Invalid word placement - must connect to existing words");
+    return;
+  }
+
   playedTiles.sort((a, b) => (isHorizontal ? a.col - b.col : a.row - b.row));
 
   let allWords = [];
@@ -659,6 +681,11 @@ export const handlePlayWord = async (
       }
   }
 
+  if (totalScore === 0) {
+      alert("Invalid word placement - must create at least one scoring word");
+      return;
+  }
+
   const newBoard = board.map((row) =>
       row.map((cell) => ({
           ...cell,
@@ -666,30 +693,19 @@ export const handlePlayWord = async (
       }))
   );
 
-  // Set the turn end score
   setTurnEndScore(totalScore);
-
-  // Trigger star effects and audio
   setShowStarEffects(true);
   setPlayEndTurnAudio(true);
-
-  // Store the previous last played tiles before updating
   setSecondToLastPlayedTiles(lastPlayedTiles);
-
-  // Update the last played tiles
   setLastPlayedTiles(playedTiles);
-
-  // Reset the turn timer and increment the key
   setTurnTimerKey((prevKey) => prevKey + 1);
 
-  // Delay for star animation and then switch to the next player
   setTimeout(() => {
-      setShowStarEffects(false); // Hide star effects
+      setShowStarEffects(false);
       const nextPlayer = (currentPlayer + 1) % 2;
       setSelectedTile(null);
       setPotentialScore(0);
 
-      // Update the player's rack locally before sending the update
       let updatedPlayers = [...players];
       const tilesToDraw = Math.max(
           0,
@@ -707,14 +723,13 @@ export const handlePlayWord = async (
       setBag(bag.filter((tile) => !newTiles.includes(tile)));
       setBoard(newBoard);
 
-      // Update the game state on the server
       socket.emit("playWord", {
           gameId: gameId,
           board: newBoard,
           players: updatedPlayers,
-          currentPlayer: currentPlayer, // Send the current player, not the next player
+          currentPlayer: currentPlayer,
           bag: bag.filter((tile) => !newTiles.includes(tile)),
-          newTiles: newTiles, // Send new tiles drawn for the current player
+          newTiles: newTiles,
           lastPlayedTiles: playedTiles,
           secondToLastPlayedTiles: lastPlayedTiles
       });

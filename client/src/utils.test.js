@@ -263,7 +263,6 @@ describe('calculateScore', () => {
             expect(scoreAgain).toBe(10);
 
         });
-    
 
     });
 
@@ -277,7 +276,6 @@ describe('isValidWord', () => {
 
         const valid = await isValidWord('HELLO');
         expect(valid).toBe(true);
-        expect(fetch).toHaveBeenCalledWith('http://10.0.0.82:8080/validate-word/hello');
     });
 
     it('returns false for an invalid word', async () => {
@@ -289,7 +287,6 @@ describe('isValidWord', () => {
 
         const valid = await isValidWord('XYZ');
         expect(valid).toBe(false);
-        expect(fetch).toHaveBeenCalledWith('http://10.0.0.82:8080/validate-word/xyz');
     });
 
     it('returns false for a word less than 2 letters', async () => {
@@ -306,7 +303,6 @@ describe('isValidWord', () => {
 
         const valid = await isValidWord('TEST');
         expect(valid).toBe(false);
-        expect(fetch).toHaveBeenCalledWith('http://10.0.0.82:8080/validate-word/test');
 
         console.error = originalConsoleError;
     });

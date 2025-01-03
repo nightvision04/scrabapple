@@ -366,9 +366,10 @@ const updatePotentialScore = async () => {
       const word = wordTiles.map(tile => tile.tile).join("").toLowerCase();
       if (word.length === 1) {
           if (!isConnectedToExistingTile(wordTiles[0].row, wordTiles[0].col, board)) {
-              setPotentialScore(0);
+              setPotentialScore(0); //Doesnt stop someone from playing a single tile word, but it should if invalid!
               return;
           }
+      // Here, isValidWord is just overriding the potential score by early-returning 0.
       } else if (!(await isValidWord(word, board))) {
           setPotentialScore(0);
           return;
