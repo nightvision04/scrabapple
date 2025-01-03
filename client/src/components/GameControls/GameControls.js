@@ -16,8 +16,8 @@ const GameControls = ({
     <div className="flex flex-wrap gap-2 justify-center -mt-2 p-4">
       <button
         onClick={onPlay}
-        className={`px-4 py-2 bg-amber-900 text-white rounded-lg transition-colors active:amber-900 ${
-          disablePlay ? "bg-amber-400 cursor-not-allowed" : "hover:bg-amber-700"
+        className={`border-2 border-[#39b2db] px-4 py-2 bg-[#C3E9F6] text-black rounded-lg transition-colors active:bg-[#C3E9F6] ${
+          disablePlay ? "bg-[#8fe2ff] cursor-not-allowed" : "hover:bg-[#8fe2ff]"
         }`}
         disabled={disablePlay}
       >
@@ -25,8 +25,8 @@ const GameControls = ({
       </button>
       <button
         onClick={onExchange}
-        className={`px-4 py-2 bg-amber-900 text-white rounded-lg transition-colors active:bg-amber-800 ${
-          disableExchangePass ? "bg-amber-400 cursor-not-allowed" : "hover:bg-amber-700"
+        className={`border-2 border-[#39b2db] px-4 py-2 bg-[#C3E9F6] text-black rounded-lg transition-colors active:bg-[#C3E9F6] ${
+          disableExchangePass ? "bg-[#8fe2ff] cursor-not-allowed" : "hover:bg-[#8fe2ff]"
         }`}
         disabled={disableExchangePass}
       >
@@ -34,8 +34,8 @@ const GameControls = ({
       </button>
       <button
         onClick={onPass}
-        className={`px-4 py-2 bg-amber-900 text-white rounded-lg transition-colors active:bg-amber-800 ${
-          disableExchangePass ? "bg-amber-400 cursor-not-allowed" : "hover:bg-amber-700"
+        className={`border-2 border-[#39b2db] px-4 py-2 bg-[#C3E9F6] text-black rounded-lg transition-colors active:bg-[#C3E9F6] ${
+          disableExchangePass ? "bg-[#8fe2ff] cursor-not-allowed" : "hover:bg-[#8fe2ff]"
         }`}
         disabled={disableExchangePass}
       >
@@ -44,7 +44,7 @@ const GameControls = ({
       {/* Remove the disabling condition for the shuffle button */}
       <button
         onClick={onShuffle}
-        className="px-4 py-2 bg-amber-900 text-white rounded-lg transition-colors active:bg-amber-800 hover:bg-amber-700"
+        className="border-2 border-[#39b2db] px-4 py-2 bg-[#C3E9F6] text-black rounded-lg transition-colors active:bg-[#C3E9F6] hover:bg-[#8fe2ff]"
       >
         <FaSyncAlt className="inline-block" />
       </button>
