@@ -36,6 +36,7 @@ describe('handlePlayWord', () => {
             setLastPlayedTiles: jest.fn(),
             setSecondToLastPlayedTiles: jest.fn(),
             setTurnTimerKey: jest.fn(),
+            setGameOver: jest.fn()
         };
 
         mockSocket = {
@@ -51,9 +52,14 @@ describe('handlePlayWord', () => {
         testBag = [];
 
         global.alert = jest.fn();
+        jest.useFakeTimers();
     };
 
     beforeEach(setup);
+
+    afterEach(() => {
+        jest.clearAllMocks();
+    });
 
     const executePlayWord = async () => {
         await handlePlayWord(
@@ -75,7 +81,8 @@ describe('handlePlayWord', () => {
             mockSetters.setLastPlayedTiles,
             mockSetters.setSecondToLastPlayedTiles,
             [],
-            mockSetters.setTurnTimerKey
+            mockSetters.setTurnTimerKey,
+            mockSetters.setGameOver
         );
     };
 
@@ -86,7 +93,6 @@ describe('handlePlayWord', () => {
     });
 
     it('accepts a two-letter word AM horizontally, running through the center of the board', async () => {
-        // try playing a valid word this time, 'AM' which runs through the center of the board
         testBoard[7][7] = { tile: 'A', bonus: null, original: false };
         testBoard[7][8] = { tile: 'M', bonus: null, original: false };
         await executePlayWord();
@@ -94,7 +100,6 @@ describe('handlePlayWord', () => {
     });
 
     it('rejects a two-letter word AM horizontally, not running through the center of the board', async () => {
-        // try playing a valid word this time, 'AM' which runs through the center of the board
         testBoard[5][7] = { tile: 'A', bonus: null, original: false };
         testBoard[5][8] = { tile: 'M', bonus: null, original: false };
         await executePlayWord();
@@ -114,4 +119,30 @@ describe('handlePlayWord', () => {
         expect(global.alert).toHaveBeenCalledWith('Invalid word placement - must connect to existing words');
     });
 
+    it('correctly calculates final scores when game ends including rack deductions', async () => {
+        // Set up a game-ending scenario
+        testBoard[7][7] = { tile: 'W', bonus: 'dw', original: false };
+        testBoard[7][8] = { tile: 'I', bonus: null, original: false };
+        testBoard[7][9] = { tile: 'N', bonus: null, original: false };
+        
+        testPlayers = [
+            { playerId: 'player1', rack: ['Q', 'Z', 'X'], score: 100 }, // High-value tiles remaining
+            { playerId: 'player2', rack: [], score: 90 } // Empty rack triggers game end
+        ];
+        testBag = []; // Empty bag for game end condition
+
+        await executePlayWord();
+        jest.advanceTimersByTime(1500);
+
+        // Find the playWord emit call
+        const emitCall = mockSocket.emit.mock.calls.find(call => call[0] === 'playWord');
+        const updatedPlayers = emitCall[1].players;
+
+        // Check final scores:
+        // Player 1: 100 (initial) + 12 (WIN) - 28 (Q=10 + Z=10 + X=8) = 84
+        // Player 2: 90 (initial) - 0 (empty rack) = 90
+        expect(updatedPlayers[0].score).toBe(84);
+        expect(updatedPlayers[1].score).toBe(90);
+        expect(mockSetters.setGameOver).toHaveBeenCalledWith(true);
+    });
 });

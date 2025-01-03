@@ -544,7 +544,8 @@ export const handlePlayWord = async (
   setLastPlayedTiles,
   setSecondToLastPlayedTiles,
   lastPlayedTiles,
-  setTurnTimerKey
+  setTurnTimerKey,
+  setGameOver
 ) => {
   const playedTiles = [];
   for (let i = 0; i < 15; i++) {
@@ -560,12 +561,8 @@ export const handlePlayWord = async (
       return;
   }
 
-  const isHorizontal =
-      playedTiles.length === 1 ||
-      playedTiles.every((tile) => tile.row === playedTiles[0].row);
-  const isVertical =
-      playedTiles.length === 1 ||
-      playedTiles.every((tile) => tile.col === playedTiles[0].col);
+  const isHorizontal = playedTiles.length === 1 || playedTiles.every((tile) => tile.row === playedTiles[0].row);
+  const isVertical = playedTiles.length === 1 || playedTiles.every((tile) => tile.col === playedTiles[0].col);
 
   if (!isHorizontal && !isVertical) {
       alert("Invalid word placement. Tiles must be in a straight line.");
@@ -575,23 +572,23 @@ export const handlePlayWord = async (
   const isFirstPlay = !board.some(row => row.some(cell => cell.tile && cell.original));
   const wordPassesThroughCenter = playedTiles.some(tile => tile.row === 7 && tile.col === 7);
   const isConnectedToExistingWord = playedTiles.some(tile => {
-    const { row, col } = tile;
-    return (
-      (row > 0 && board[row-1][col].tile && board[row-1][col].original) ||
-      (row < 14 && board[row+1][col].tile && board[row+1][col].original) ||
-      (col > 0 && board[row][col-1].tile && board[row][col-1].original) ||
-      (col < 14 && board[row][col+1].tile && board[row][col+1].original)
-    );
+      const { row, col } = tile;
+      return (
+          (row > 0 && board[row-1][col].tile && board[row-1][col].original) ||
+          (row < 14 && board[row+1][col].tile && board[row+1][col].original) ||
+          (col > 0 && board[row][col-1].tile && board[row][col-1].original) ||
+          (col < 14 && board[row][col+1].tile && board[row][col+1].original)
+      );
   });
 
   if (isFirstPlay) {
-    if (!wordPassesThroughCenter) {
-      alert("Invalid word placement - First word needs to connect to the center of the board");
-      return;
-    }
+      if (!wordPassesThroughCenter) {
+          alert("Invalid word placement - First word needs to connect to the center of the board");
+          return;
+      }
   } else if (!isConnectedToExistingWord) {
-    alert("Invalid word placement - must connect to existing words");
-    return;
+      alert("Invalid word placement - must connect to existing words");
+      return;
   }
 
   playedTiles.sort((a, b) => (isHorizontal ? a.col - b.col : a.row - b.row));
@@ -693,11 +690,18 @@ export const handlePlayWord = async (
       }))
   );
 
+  // Set the turn end score
   setTurnEndScore(totalScore);
+
+  // Trigger star effects and audio
   setShowStarEffects(true);
   setPlayEndTurnAudio(true);
+
+  // Store the previous last played tiles before updating
   setSecondToLastPlayedTiles(lastPlayedTiles);
   setLastPlayedTiles(playedTiles);
+
+  // Reset the turn timer and increment the key
   setTurnTimerKey((prevKey) => prevKey + 1);
 
   setTimeout(() => {
@@ -707,17 +711,24 @@ export const handlePlayWord = async (
       setPotentialScore(0);
 
       let updatedPlayers = [...players];
-      const tilesToDraw = Math.max(
-          0,
-          7 - updatedPlayers[currentPlayer].rack.length
-      );
+      const tilesToDraw = Math.max(0, 7 - updatedPlayers[currentPlayer].rack.length);
       const newTiles = drawTiles(bag, tilesToDraw);
 
-      updatedPlayers[currentPlayer].rack = [
-          ...updatedPlayers[currentPlayer].rack,
-          ...newTiles,
-      ];
+      updatedPlayers[currentPlayer].rack = [...updatedPlayers[currentPlayer].rack, ...newTiles];
       updatedPlayers[currentPlayer].score += totalScore;
+
+      // Check for game end condition and calculate final scores
+      if (bag.length === 0 && (updatedPlayers[0].rack.length === 0 || updatedPlayers[1].rack.length === 0)) {
+          // Calculate and apply deductions for remaining tiles
+          updatedPlayers = updatedPlayers.map(player => {
+              const deduction = player.rack.reduce((sum, tile) => sum + LETTER_VALUES[tile], 0);
+              return {
+                  ...player,
+                  score: player.score - deduction
+              };
+          });
+          setGameOver(true);
+      }
 
       setPlayers(updatedPlayers);
       setBag(bag.filter((tile) => !newTiles.includes(tile)));
