@@ -264,6 +264,30 @@ describe('calculateScore', () => {
 
         });
 
+        it('should add 50-point bonus when playing all 7 tiles', () => {
+            const board = Array(15).fill(null).map(() => Array(15).fill({ tile: null, bonus: null }));
+            
+            // Playing "RAINBOW" horizontally from center
+            const playedTiles = [
+                { row: 7, col: 7, tile: 'R' },
+                { row: 7, col: 8, tile: 'A' },
+                { row: 7, col: 9, tile: 'I' },
+                { row: 7, col: 10, tile: 'N' },
+                { row: 7, col: 11, tile: 'B' },
+                { row: 7, col: 12, tile: 'O' },
+                { row: 7, col: 13, tile: 'W' }
+            ];
+
+            // Place tiles on board
+            playedTiles.forEach(({row, col, tile}) => {
+                board[row][col] = { tile, bonus: null };
+            });
+
+            const score = calculateScore(playedTiles, board);
+            // R(1) + A(1) + I(1) + N(1) + B(3) + O(1) + W(4) = 12 base points + 50 bonus = 62
+            expect(score).toBe(62);
+        });
+
     });
 
 describe('isValidWord', () => {

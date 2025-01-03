@@ -175,6 +175,8 @@ export const calculateScore = (playedTiles, board) => {
         }
     }
 
+    if (playedTiles.length === 7) totalScore += 50;
+
     return totalScore;
 };
 
