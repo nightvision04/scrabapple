@@ -585,7 +585,7 @@ return (
           {gameStarted && (
             <button 
               onClick={() => setShowQuitConfirmation(true)}
-              className="absolute top-2 right-2 z-10 p-1 rounded-full transition-colors"
+              className="absolute top-2 right-2 z-1 p-1 rounded-full transition-colors"
               title="Quit Game"
             >
               <FaTimes className="text-gray-500 hover:text-gray-700 text-xl" />
