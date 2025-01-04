@@ -32,6 +32,7 @@ import Timer from "./components/Timer/Timer";
 import GameTimer from "./components/Timer/GameTimer";
 import StartupScreen from "./components/StartupScreen/StartupScreen";
 import { Helmet } from 'react-helmet-async';
+import { FaTimes } from 'react-icons/fa';
 
 function isTouchDevice() {
   return (
@@ -80,6 +81,7 @@ function App() {
   const [showStartup, setShowStartup] = useState(true);
   const [waitingStats, setWaitingStats] = useState({ onlinePlayerCount: 0, averageWaitTime: 0 });
   const [isSearchingForGame, setIsSearchingForGame] = useState(false);
+  const [showQuitConfirmation, setShowQuitConfirmation] = useState(false);
 
   const { tapSelectAudio, tapPlaceAudio, endTurnAudio, endGameAudio } =
     useAudioPlayers();
@@ -490,6 +492,8 @@ const isConnectedToExistingTile = (row, col, board) => {
         }
     }, 5000);
 
+    window.location.reload();
+
     setWaitingRetryId(retryTimeoutId);
 };
 
@@ -572,7 +576,43 @@ return (
           {gameOver && gameStarted && (
             <EndScreen players={players} onNewGame={handleNewGame} />
           )}
-          {/* {!gameStarted && <Waiting />} */}
+          
+          {/* Quit Game Button and Confirm Modal*/}
+          {gameStarted && (
+            <button 
+              onClick={() => setShowQuitConfirmation(true)}
+              className="absolute top-2 right-2 z-10 p-1 rounded-full transition-colors"
+              title="Quit Game"
+            >
+              <FaTimes className="text-gray-500 hover:text-gray-700 text-xl" />
+            </button>
+          )}
+          {showQuitConfirmation && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white p-6 rounded-lg shadow-xl text-center m-6">
+                <h2 className="text-xl font-bold mb-4">Quit Game?</h2>
+                <p className="mb-6">Are you sure you want to quit the current game?</p>
+                <div className="flex justify-center space-x-4">
+                  <button 
+                    onClick={() => setShowQuitConfirmation(false)} 
+                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setShowQuitConfirmation(false);
+                      handleNewGame();
+                    }} 
+                    className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                  >
+                    Quit Game
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {!gameOver && gameStarted && (
             <>
               <div

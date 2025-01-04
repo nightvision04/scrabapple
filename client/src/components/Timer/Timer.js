@@ -81,7 +81,7 @@ const Timer = ({
   };
 
 return (
-    <div className="absolute top-2 right-3 flex flex-col items-center">
+    <div className="absolute top-2 right-5 flex flex-col items-center">
         <span className="text-[10px] w-[60px] text-gray-600">Turn Time</span>
         <span className={`text-xs ${getTimerColor()}`}>
             {minutes.toString().padStart(2, "0")}:

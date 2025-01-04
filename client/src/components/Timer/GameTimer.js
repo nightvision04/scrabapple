@@ -26,7 +26,7 @@ const GameTimer = ({ duration, onTimeout, isPaused }) => {
     const seconds = secondsRemaining % 60;
   
     return (
-        <div className="absolute top-2 left-3 flex flex-col items-center">
+        <div className="absolute top-2 left-5 flex flex-col items-center">
             <span className="text-[10px] w-[60px] text-gray-600">Game Time</span>
             <span className="text-xs text-blue-800">
                 {minutes.toString().padStart(2, "0")}:
