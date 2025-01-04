@@ -12,7 +12,7 @@ const Scoreboard = ({ players, currentPlayer, playerName }) => {
                     `}
                 >
                     <span className="font-bold text-xs">
-                        {index != currentPlayer ? playerName : `Player ${index + 1}`}:
+                        {index !== currentPlayer ? playerName : `Player ${index + 1}`}:
                     </span>
                     <span className="ml-2 text-xs">{player.score}</span>
                 </div>

@@ -3,7 +3,7 @@ import { FaLink } from 'react-icons/fa';
 
 const EnhancedWaiting = ({ onlinePlayers = 0, averageWaitTime = 0 }) => {
   const [copied, setCopied] = useState(false);
-  const siteUrl = 'https://scrabapple.ca';
+  const siteUrl = 'https://www.scrabapple.ca';
 
   const formatWaitTime = (seconds) => {
     if (seconds < 60) return `${seconds} seconds`;
