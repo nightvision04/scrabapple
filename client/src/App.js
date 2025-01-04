@@ -82,6 +82,7 @@ function App() {
   const [waitingStats, setWaitingStats] = useState({ onlinePlayerCount: 0, averageWaitTime: 0 });
   const [isSearchingForGame, setIsSearchingForGame] = useState(false);
   const [showQuitConfirmation, setShowQuitConfirmation] = useState(false);
+  const [currentPlayerIndex, setCurrentPlayerIndex] = useState(null);
 
   const { tapSelectAudio, tapPlaceAudio, endTurnAudio, endGameAudio } =
     useAudioPlayers();
@@ -159,7 +160,10 @@ function App() {
                   updatedPlayers[playerIndex].rack.push(...gameState.newTiles);
                   setPlayers(updatedPlayers);
                 }
-              }
+
+              const playerName = getCookie('player-name') || 'Player asdf';
+              setPlayerName(playerName);
+            }
             });
 
             socket.on('gameStats', (stats) => {
@@ -630,7 +634,7 @@ return (
                 isComplete={showStarEffects}
                 setIsComplete={setShowStarEffects}
               />
-              <Scoreboard players={players} currentPlayer={currentPlayer} />
+              <Scoreboard players={players} currentPlayer={currentPlayer} playerName={playerName}/>
 
               <div className="flex items-center justify-center text-xs gap-4">
                 <span>
