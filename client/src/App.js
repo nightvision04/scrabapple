@@ -742,7 +742,11 @@ return (
                   }
                   disablePlay={!isCurrentPlayerTurn()}
                   disableExchangePass={!isCurrentPlayerTurn()}
+                  socketRef={socketRef}
+                  gameId={gameId}
+                  playerId={playerId}
                 />
+
               </DragDropContext>
               {showBlankTileModal && (
                 <div className="modal-container fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">

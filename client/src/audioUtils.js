@@ -17,6 +17,7 @@ export const useAudioPlayers = () => {
   const tapPlaceAudio = useAudio('/tap-place.mp3');
   const endTurnAudio = useAudio('/stars.mp3');
   const endGameAudio = useAudio('/end-game.mp3');
+  const messageRecieveAudio = useAudio('/message-recieve.mp3');
 
-  return { tapSelectAudio, tapPlaceAudio, endTurnAudio, endGameAudio };
+  return { tapSelectAudio, tapPlaceAudio, endTurnAudio, endGameAudio, messageRecieveAudio };
 };
