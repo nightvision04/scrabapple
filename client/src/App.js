@@ -79,6 +79,7 @@ function App() {
   const [playerName, setPlayerName] = useState('');
   const [showStartup, setShowStartup] = useState(true);
   const [waitingStats, setWaitingStats] = useState({ onlinePlayerCount: 0, averageWaitTime: 0 });
+  const [isSearchingForGame, setIsSearchingForGame] = useState(false);
 
   const { tapSelectAudio, tapPlaceAudio, endTurnAudio, endGameAudio } =
     useAudioPlayers();
@@ -91,9 +92,11 @@ function App() {
           const newSocket = io(serverUrl);
           socketRef.current = newSocket;
           setSocket(newSocket);
-          newSocket.on("connect", () => {
-              newSocket.emit("joinGame", playerIdToUse);
-          });
+          if (isSearchingForGame) {
+            newSocket.on("connect", () => {
+                newSocket.emit("joinGame", playerIdToUse);
+            });
+        }
       }
 
         const playerCookie = getCookie("player-id");
@@ -111,7 +114,7 @@ function App() {
         setPlayerId(playerIdToUse);
 
         return () => socketRef.current.close();
-      }, []);
+      }, [isSearchingForGame]);
 
       useEffect(() => {
         if (socket) {
@@ -514,10 +517,12 @@ return (
         onJoinGame={(name) => {
             setPlayerName(name);
             setShowStartup(false);
+            setIsSearchingForGame(true);
         }}
         onPlayAsGuest={() => {
             setPlayerName('Guest');
             setShowStartup(false);
+            setIsSearchingForGame(true);
         }}
     />
       ) : !gameStarted ? (
