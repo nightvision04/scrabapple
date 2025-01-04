@@ -89,6 +89,11 @@ function calculateTotalTiles(game) {
 io.on("connection", (socket) => {
     console.log("New client connected:", socket.id);
 
+    socket.on('sendChatMessage', (messageData) => {
+        console.log('Chat message received:', messageData);
+        socket.to(messageData.gameId).emit('chatMessage', messageData);
+    });
+
     socket.on("joinGame", (playerId) => {
         console.log("joinGame - Player joined game:", playerId);
 
